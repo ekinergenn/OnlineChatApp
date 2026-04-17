@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
+from communitiesPage import CommunitiesPageUI
 
 # Tıklanabilir sohbet listesi elemanları için özel QFrame sınıfı
 class ClickableFrame(QFrame):
@@ -46,12 +47,7 @@ class MainPageUI(QWidget):
         self.main_stack.addWidget(self.chats_page)
 
         # Sayfa 2: Topluluklar Sayfası (Örnek Boş Sayfa)
-        self.communities_page = QWidget()
-        communities_layout = QVBoxLayout(self.communities_page)
-        com_label = QLabel("👥 Topluluklar Sayfası Yapım Aşamasında...")
-        com_label.setStyleSheet("font-size: 24px; color: #667781;")
-        com_label.setAlignment(Qt.AlignCenter)
-        communities_layout.addWidget(com_label)
+        self.communities_page = CommunitiesPageUI(self)
         
         self.main_stack.addWidget(self.communities_page)
 
@@ -81,12 +77,19 @@ class MainPageUI(QWidget):
 
         nav_layout.addStretch()  # Arayı aç
 
-        # Ayarlar ve Profil
-        for icon_text, tooltip in [("⚙️", "Ayarlar"), ("👤", "Profilim")]:
-            btn = QPushButton(icon_text)
-            btn.setToolTip(tooltip)
-            self.setup_nav_button(btn)
-            nav_layout.addWidget(btn)
+        # Ayarlar
+        self.btn_settings = QPushButton("⚙️")
+        self.btn_settings.setToolTip("Ayarlar")
+        self.setup_nav_button(self.btn_settings)
+        #self.btn_settings.clicked.connect() # Ayarlar sayfası eklenince eklenecek
+        nav_layout.addWidget(self.btn_settings)
+
+        # Profil
+        self.btn_profile = QPushButton("👤")
+        self.btn_profile.setToolTip("Profilim")
+        self.setup_nav_button(self.btn_profile)
+        #self.btn_profile.clicked.connect()
+        nav_layout.addWidget(self.btn_profile)
 
         self.main_layout.addWidget(nav_frame)
 
