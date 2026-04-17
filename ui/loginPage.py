@@ -41,7 +41,7 @@ class LoginPageUI(QWidget):
         card_layout.addWidget(welcome_label)
 
         # İnputlar
-        input_style = "QLineEdit { background-color: #f0f2f5; border: 1px solid #d1d7db; border-radius: 8px; padding: 12px 15px; font-size: 14px; } QLineEdit:focus { border: 2px solid #3b82f6; background-color: #ffffff; }"
+        input_style = "QLineEdit { background-color: #f0f2f5; border: 1px solid #d1d7db; border-radius: 8px; padding: 12px 15px; font-size: 14px; color: black;} QLineEdit:focus { border: 2px solid #3b82f6; background-color: #ffffff; color: black;}"
 
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Kullanıcı Adı")

@@ -40,8 +40,7 @@ class MainPageUI(QWidget):
         # Menü İkonları (Buton olarak)
         nav_buttons = [
             ("💬", "Sohbetler"),
-            ("👥", "Topluluklar"),
-            ("📢", "Kanallar")
+            ("👥", "Topluluklar")
         ]
 
         # Üst İkonlar
