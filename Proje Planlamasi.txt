@@ -1,0 +1,67 @@
+
+
+
+1. models/ Katmanı (Veri Yapıları)
+Burası uygulamanızın **"İsimler Sözlüğü"**dür. Sadece veri tutarlar, aksiyon almazlar.
+
+Nasıl Kodlanmalı?
+
+- Buradaki dosyalar (user.py, message.py, chat.py) sadece Sınıflardan (Class) oluşmalıdır.
+
+- Python'daki @dataclass yapısını kullanmanız kodunuzu çok temizleştirir.
+
+- Örnek message.py Planı: Sadece id, sender_id, receiver_id, content, timestamp, is_read gibi özellikleri (attribute) olmalı.
+
+KESİNLİKLE YAPILMAMASI GEREKEN: Bu klasördeki hiçbir dosya veritabanına bağlanmamalı, ağa veri göndermemeli veya UI değiştirmemelidir. Sadece veriyi paketlemek veya açmak için kullanılırlar.
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+2. services/ Katmanı (İş Mantığı - Business Logic)
+Burası uygulamanızın **"Beyni"**dir. Kontrolcüler (Controllers) aptaldır; sadece butona basıldığını bilirler. Gerçek işi Servisler yapar. Ekibinizin en çok kod yazacağı yer burasıdır.
+
+Nasıl Kodlanmalı?
+
+- logReg_service.py: Kullanıcı giriş yap butonuna bastığında controller buraya kullanıcı adı ve şifreyi atar. Bu servis şifrenin geçerliliğini kontrol eder, validation_service.py'a sorar, ağ üzerinden sunucuya doğrulama isteği atar.
+
+- encryption_service.py: RSA veya AES şifreleme/çözme işlemlerinin matematiği sadece burada yaşar. Diğer dosyalar buraya düz metin verir, şifreli metin alır. Şifrelemenin nasıl yapıldığını kimse bilmez.
+
+- message_service.py: Bir mesaj gönderileceği zaman bu servis çalışır. Mesajı models/message.py formatına sokar, encryption_service ile şifreler ve en son network katmanına "Bunu yolla" der.
+
+- KESİNLİKLE YAPILMAMASI GEREKEN: Servisler UI elementlerini (PyQt widget'larını) bilemez. İçerisinde textbox.setText() gibi kodlar barındıramazlar.
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+3. network/ Katmanı (İletişim ve Taşıma)
+Burası uygulamanızın **"Kargo Şirketi"**dir. Paketin içinde ne olduğunu umursamaz, sadece paketin güvenli bir şekilde A noktasından B noktasına gitmesinden sorumludur.
+
+Nasıl Kodlanmalı?
+
+-protocol.py: Ekibin en başta anlaşıp kilitlemesi gereken dosya budur. Veri ağda nasıl gezecek? (Örn: {"header": "LOGIN", "data": {...}}). Json mı, byte mı? Bu kuralı burada yazarsınız.
+
+-connection.py: Ham soket (socket) işlemlerinin yapıldığı yer. send() ve recv() fonksiyonları burada güvenli hale getirilir (kopmaları yönetme, büyük verileri parçalama).
+
+-message_handler.py: Ağdan bir veri geldiğinde ilk buraya düşer. Bu dosya paketi açar, tipine bakar ("Aaa, bu bir sohbet mesajıymış") ve onu ilgili servise (chat_service) yönlendirir.
+
+-server.py ve client.py: Soketlerin dinlendiği ve bağlantıların tutulduğu ana motorlardır.
+
+KESİNLİKLE YAPILMAMASI GEREKEN: Ağ katmanı şifreleme yapmaz (onu servis yapar). Ağ katmanı ekrana hata mesajı basmaz (hatayı fırlatır, controller ekrana basar).
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+2. Asenkron Programlama (En Büyük Ölümcül Hata!):
+PyQt ile ağ programlamayı birleştirirken yapılan en büyük hata ana iş parçacığını (Main Thread) dondurmaktır. Eğer network/client.py içinde sunucudan mesaj gelmesini bekleyen bir while True: socket.recv() döngüsü kurarsanız, arayüzünüz (UI) donar.
+
+Ne Yapmalısınız? Ağdan veri dinleme işlemini PyQt'nin QThread sınıfı ile ayrı bir iş parçacığında yapmalısınız. Ağdan mesaj geldiğinde, bu thread ana UI'a bir Signal (sinyal) fırlatmalıdır.
+
+3. "Bağımlılıkların Tek Yönlü Olması" Kuralı:
+Okların yönü her zaman içeriden dışarıya olmalıdır.
+
+UI -> Controllers'ı çağırır.
+
+Controllers -> Services'i çağırır.
+
+Services -> Network ve Database'i çağırır.
+
+Asla tersi olamaz! (Örneğin network katmanındaki bir dosya controllers içindeki bir fonksiyonu doğrudan "import" edip çağıramaz. Eğer network'ten arayüze veri gidecekse, Event'ler, Callback'ler veya Signal'ler kullanılır).
+
+Bu yapı ve kurallar etrafında çalışırsanız, her biriniz kendi klasöründe kod yazarken birbirinizi hiç ezmezsiniz ve proje bittiğinde profesyonel bir şirketin elinden çıkmış gibi çalışır.
