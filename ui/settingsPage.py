@@ -77,8 +77,8 @@ class SettingsPageUI(QWidget):
         self.scroll_layout.setAlignment(Qt.AlignTop)
 
         # butonlar
-        self.profil_btn = self.create_setting_button("👤", "Profil", "Profil detaylarını değiştir.", 1)
-        self.scroll_layout.addWidget(self.profil_btn)
+        self.yildiz_btn = self.create_setting_button("🌟", "Yıldızı Mesajlar", "Yıldızladığın mesajlarını görüntüle, düzenle.", 1)
+        self.scroll_layout.addWidget(self.yildiz_btn)
         self.gizlilik_btn = self.create_setting_button("🔐", "Gizlilik", "Engellenen kişiler, çevrimiçi bilgisi...", 2)
         self.scroll_layout.addWidget(self.gizlilik_btn)
         self.bildirimler_btn = self.create_setting_button("🔔", "Bildirimler", "Mesaj sesleri ve grup uyarıları", 3)
