@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
 from communitiesPage import CommunitiesPageUI
+from settingsPage import SettingsPageUI
 
 # Tıklanabilir sohbet listesi elemanları için özel QFrame sınıfı
 class ClickableFrame(QFrame):
@@ -34,7 +35,7 @@ class MainPageUI(QWidget):
         self.main_stack = QStackedWidget(self)
         self.main_layout.addWidget(self.main_stack)
 
-        # Sayfa 1: Sohbetler Sayfası (Sohbet listesi + Sohbet Ekranı)
+        # Sayfa 1: Sohbetler Sayfası (Sohbet listesi + Sohbet Ekranı) index 0
         self.chats_page = QWidget()
         self.chats_page_layout = QHBoxLayout(self.chats_page)
         self.chats_page_layout.setContentsMargins(0, 0, 0, 0)
@@ -46,10 +47,14 @@ class MainPageUI(QWidget):
         
         self.main_stack.addWidget(self.chats_page)
 
-        # Sayfa 2: Topluluklar Sayfası (Örnek Boş Sayfa)
+        # Sayfa 2: Topluluklar Sayfası (Örnek Boş Sayfa) index 1
         self.communities_page = CommunitiesPageUI(self)
         
         self.main_stack.addWidget(self.communities_page)
+
+        #sayfa 3: ayarlar index 2
+        self.settings_page = SettingsPageUI(self)
+        self.main_stack.addWidget(self.settings_page)
 
     def create_nav_bar(self):
         nav_frame = QFrame()
@@ -81,7 +86,7 @@ class MainPageUI(QWidget):
         self.btn_settings = QPushButton("⚙️")
         self.btn_settings.setToolTip("Ayarlar")
         self.setup_nav_button(self.btn_settings)
-        #self.btn_settings.clicked.connect() # Ayarlar sayfası eklenince eklenecek
+        self.btn_settings.clicked.connect(lambda: self.main_stack.setCurrentIndex(2))
         nav_layout.addWidget(self.btn_settings)
 
         # Profil
