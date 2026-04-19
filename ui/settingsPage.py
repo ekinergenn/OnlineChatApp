@@ -240,11 +240,3 @@ class SettingsPageUI(QWidget):
         layout.addWidget(title, alignment=Qt.AlignCenter)
         layout.addWidget(desc, alignment=Qt.AlignCenter)
         return page
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = SettingsPageUI()
-    window.resize(1100, 800)
-    window.show()
-    sys.exit(app.exec_())

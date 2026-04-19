@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
 from communitiesPage import CommunitiesPageUI
 from settingsPage import SettingsPageUI
+from profilePage import ProfilePageUI
 
 # Tıklanabilir sohbet listesi elemanları için özel QFrame sınıfı
 class ClickableFrame(QFrame):
@@ -56,6 +57,10 @@ class MainPageUI(QWidget):
         self.settings_page = SettingsPageUI(self)
         self.main_stack.addWidget(self.settings_page)
 
+        # Sayfa 4: Profil Sayfası index 3
+        self.profile_page = ProfilePageUI(self)
+        self.main_stack.addWidget(self.profile_page)
+
     def create_nav_bar(self):
         nav_frame = QFrame()
         nav_frame.setFixedWidth(65)
@@ -93,7 +98,7 @@ class MainPageUI(QWidget):
         self.btn_profile = QPushButton("👤")
         self.btn_profile.setToolTip("Profilim")
         self.setup_nav_button(self.btn_profile)
-        #self.btn_profile.clicked.connect()
+        self.btn_profile.clicked.connect(lambda: self.main_stack.setCurrentIndex(3))
         nav_layout.addWidget(self.btn_profile)
 
         self.main_layout.addWidget(nav_frame)
