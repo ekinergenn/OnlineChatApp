@@ -5,9 +5,9 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
-from communitiesPage import CommunitiesPageUI
-from settingsPage import SettingsPageUI
-from profilePage import ProfilePageUI
+from ui.communitiesPage import CommunitiesPageUI
+from ui.settingsPage import SettingsPageUI
+from ui.profilePage import ProfilePageUI
 
 # Tıklanabilir sohbet listesi elemanları için özel QFrame sınıfı
 class ClickableFrame(QFrame):

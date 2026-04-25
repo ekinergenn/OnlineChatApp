@@ -1,64 +1,57 @@
 import socket
-import threading
 import json
+from network.message_handler import MessageHandler
+from network.protocol import Protocol
 
-# Sunucuya bağlanmak için ayarlar (Server ile aynı olmalı)
-HOST = '127.0.0.1'
-PORT = 12345
+class Client:
+    def __init__(self,services:list, host='127.0.0.1', port=12345):
+        self.host = host
+        self.port = port
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.message_handler = MessageHandler(services)
 
-def receive_messages(client_socket):
-    """Sunucudan gelen mesajları arka planda sürekli dinleyen fonksiyon."""
-    while True:
+    def register_services(self, services_dict):
+            """Servisler yaratıldıktan sonra Client'a bu fonksiyonla tanıtılır."""
+            self.message_handler.services = services_dict
+    def connect(self):
+        """Sunucuya bağlanmayı dener."""
         try:
-            data = client_socket.recv(1024)
-            if not data:
-                break
-            
-            # Gelen byte verisini sözlüğe (dict) çevir
-            message_dict = json.loads(data.decode('utf-8'))
-            print(f"\n[{message_dict['sender']}]: {message_dict['content']}")
-            
+            self.client_socket.connect((self.host, self.port))
+            print("[SİSTEM] Sunucuya başarıyla bağlanıldı.")
+            return True
         except Exception as e:
-            print("[HATA] Sunucu ile bağlantı koptu!")
-            client_socket.close()
-            break
+            print(f"[HATA] Sunucuya bağlanılamadı: {e}")
+            return False
 
-def start_client():
-    """İstemciyi başlatır ve sunucuya bağlar."""
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    
-    try:
-        client.connect((HOST, PORT))
-        print("[BAŞARILI] Sunucuya bağlanıldı!")
-    except ConnectionRefusedError:
-        print("[HATA] Sunucu bulunamadı. Lütfen önce server.py dosyasını çalıştırın.")
-        return
+    def send_data(self,packet) -> bool:
+        """Veriyi güvenli bir şekilde karşıya gönderir."""
+        try:
+            self.client_socket.sendall(Protocol.create_packet(packet))
+            return True
+        except socket.error as e:
+            print(f"[AĞ HATASI] Veri gönderilemedi: {e}")
+            return False
 
-    # Kullanıcıdan isim al (Senin projende bu arayüzden logReg_service üzerinden gelecek)
-    username = input("Kullanıcı adınızı girin: ")
+    def receive_data(self, buffer_size=4096) -> bytes:
+        """Ağdan gelen veriyi okur. Bağlantı koparsa boş byte döndürür."""
+        try:
+            data = self.client_socket.recv(buffer_size)
+            return data
+        except ConnectionResetError:
+            print("[AĞ UYARISI] Karşı taraf bağlantıyı kopardı.")
+            return b""
 
-    # Sunucudan gelen mesajları dinlemek için ayrı bir thread başlat
-    # Aksi takdirde input() fonksiyonu mesaj gelmesini engeller (Uygulama donar)
-    receive_thread = threading.Thread(target=receive_messages, args=(client,))
-    receive_thread.start()
-
-    # Kullanıcıdan sürekli mesaj alıp sunucuya gönder
-    while True:
-        msg_content = input("")
-        if msg_content.lower() == 'cikis':
-            client.close()
-            break
-            
-        # Gönderilecek veriyi JSON protokolü şeklinde paketle
-        message_packet = {
-            "type": "chat_message",
-            "sender": username,
-            "content": msg_content
-        }
-        
-        # Paketlenen veriyi stringe ve ardından byte'a çevirip gönder
-        json_data = json.dumps(message_packet)
-        client.send(json_data.encode('utf-8'))
-
-if __name__ == "__main__":
-    start_client()
+    def listen_for_messages(self):
+        """Sürekli olarak sunucudan mesaj bekler. 
+        UYARI: Bu fonksiyon ana programı donduracağı için ayrı thread'de çağrılmalıdır!"""
+        while True:
+            try:
+                data = self.receive_data()
+                if not data:
+                    break
+                self.message_handler.handle_incoming_data(data)
+                
+            except Exception:
+                print("\n[SİSTEM] Sunucu bağlantısı koptu.")
+                self.client_socket.close()
+                break
