@@ -24,6 +24,8 @@ class MainPageUI(QWidget):
     block_user_signal = pyqtSignal(str)
     send_message_signal = pyqtSignal(str, str)
     load_history_signal = pyqtSignal(str)
+    search_query_signal = pyqtSignal(str)
+    start_chat_signal = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -151,6 +153,7 @@ class MainPageUI(QWidget):
         search_layout.setContentsMargins(15, 5, 15, 15)
 
         self.search_input = QLineEdit()
+        self.search_input.textChanged.connect(self.on_search_changed)
         self.search_input.setPlaceholderText("🔍 Aratın veya yeni sohbet başlatın")
         self.search_input.setStyleSheet("""
             QLineEdit {
@@ -173,13 +176,7 @@ class MainPageUI(QWidget):
         self.scroll_layout.setAlignment(Qt.AlignTop)
 
         self.dummy_chats = [
-            ("Ağlar Proje Grubu", "Socket kodunu kim yazıyor?", "13:45", True),
-            ("Ahmet Yılmaz", "Tamamdır, akşam bakarız.", "12:10", False),
-            ("Ayşe Kaya", "PDF dosyasını gönderdim.", "Dün", False),
-            ("Marmara Duyuru", "Vize tarihleri açıklandı.", "Pzt", True),
-            ("Python Topluluğu", "PyQt5 mi PyQt6 mı?", "Pzr", False),
-            ("Mehmet (Ev)", "Ekmek al gelirken.", "14 Eki", False),
-            ("Hoca", "Proje teslimi Cuma günü.", "10 Eki", False)
+
         ]
 
         # StackWidget'taki indeksler 0 (Hoşgeldin) ile başlayacağı için, 
@@ -382,27 +379,18 @@ class MainPageUI(QWidget):
             print(f"[{chat_name}] sohbeti silindi!")
             self.delete_chat_signal.emit(chat_name)
 
-    def add_new_chat_to_ui(self, chat_name):
-        """Sunucudan başarılı yanıt gelince yeni grubu sol listeye ve sağ ekrana ekler."""
-        # 1. Yeni eklenecek ekranın index numarasını hesapla
+    def add_new_chat_to_ui(self, chat_name, last_message=""):
         new_stack_index = self.chat_screens_stack.count()
-
-        # 2. Sol taraftaki kaydırılabilir listeye yeni butonu ekle
-        # (create_chat_item fonksiyonunuza uygun parametreler gönderiyoruz)
         new_chat_item = self.create_chat_item(
             name=chat_name,
-            last_message="Grubu oluşturdunuz.",
-            time="Şimdi",
+            last_message=last_message,  # ← boş bırak
+            time="",
             is_unread=False,
             stack_index=new_stack_index
         )
-        self.scroll_layout.insertWidget(0, new_chat_item)  # En üste ekler
-
-        # 3. Sağ taraftaki sohbet alanına bu gruba ait yeni bir ekran ekle
+        self.scroll_layout.insertWidget(0, new_chat_item)
         new_chat_screen = self.create_individual_chat_screen(chat_name)
         self.chat_screens_stack.addWidget(new_chat_screen)
-
-        # 4. Hemen yeni açılan grubun sohbet ekranına geçiş yap
         self.chat_screens_stack.setCurrentIndex(new_stack_index)
 
     def on_send_clicked(self, chat_name, input_field):
@@ -557,6 +545,68 @@ class MainPageUI(QWidget):
 
         # 3. Hoş geldin ekranına dön
         self.chat_screens_stack.setCurrentIndex(0)
+
+    def on_search_changed(self, text):
+        print(f"[DEBUG] Arama kutusu değişti: {text}")
+        if text.strip():
+            self.search_query_signal.emit(text.strip())
+        else:
+            self.clear_search_results()
+
+    def show_search_results(self, users: list):
+        self.clear_search_results()
+        for user in users:
+            result_item = self.create_search_result_item(user)
+            self.scroll_layout.insertWidget(0, result_item)
+
+    def clear_search_results(self):
+        for i in reversed(range(self.scroll_layout.count())):
+            item = self.scroll_layout.itemAt(i)
+            if item and item.widget():
+                widget = item.widget()
+                if hasattr(widget, 'is_search_result') and widget.is_search_result:
+                    self.scroll_layout.removeWidget(widget)
+                    widget.deleteLater()
+
+    def create_search_result_item(self, user: dict):
+        item_frame = ClickableFrame()
+        item_frame.is_search_result = True
+        item_frame.setFixedHeight(75)
+        item_frame.setCursor(QCursor(Qt.PointingHandCursor))
+        item_frame.setStyleSheet("""
+            QFrame { background-color: #f0f8ff; border-bottom: 1px solid #d1d7db; }
+            QFrame:hover { background-color: #e0f0ff; }
+        """)
+
+        layout = QHBoxLayout(item_frame)
+        layout.setContentsMargins(15, 10, 15, 10)
+        layout.setSpacing(15)
+
+        avatar = QLabel("👤")
+        avatar.setFixedSize(50, 50)
+        avatar.setAlignment(Qt.AlignCenter)
+        avatar.setStyleSheet("background-color: #dfe5e7; border-radius: 25px; font-size: 24px;")
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(2)
+
+        name_label = QLabel(user.get("fullname", ""))
+        name_label.setStyleSheet("font-size: 16px; color: #111b21; font-weight: 500;")
+
+        info_label = QLabel(f"@{user.get('username')} • {user.get('tel', '')}")
+        info_label.setStyleSheet("font-size: 13px; color: #667781;")
+
+        text_layout.addWidget(name_label)
+        text_layout.addWidget(info_label)
+
+        layout.addWidget(avatar)
+        layout.addLayout(text_layout)
+        layout.addStretch()
+
+        username = user.get("username")
+        item_frame.clicked.connect(lambda: self.start_chat_signal.emit(username))
+
+        return item_frame
 
 
 

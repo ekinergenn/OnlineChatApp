@@ -7,6 +7,8 @@ class ChatService(QObject):
     create_group_response_signal = pyqtSignal(dict)
     delete_chat_response_signal = pyqtSignal(dict)
     receive_message_signal = pyqtSignal(dict)
+    user_chats_loaded_signal = pyqtSignal(list)
+    search_results_signal = pyqtSignal(list)
 
     def __init__(self, client):
         super().__init__()
@@ -63,3 +65,28 @@ class ChatService(QObject):
         """messages.json'dan sohbet geçmişini çeker."""
         from database.message_repository import get_messages
         return get_messages(chat_name)
+
+    def send_search_request(self, query: str, username: str):
+        packet = {
+            "type": "search_users_request",
+            "payload": {
+                "query": query,
+                "username": username
+            }
+        }
+        self.client.send_data(packet)
+
+    def handle_search_response(self, payload: dict):
+        results = payload.get("results", [])
+        self.search_results_signal.emit(results)
+
+    def send_create_chat_request(self, target_username: str, my_username: str):
+        packet = {
+            "type": "create_chat_request",
+            "payload": {
+                "chat_name": target_username,
+                "members": [my_username, target_username],
+                "is_group": False
+            }
+        }
+        self.client.send_data(packet)

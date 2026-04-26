@@ -5,6 +5,8 @@ from database.user_repository import find_user, create_user
 from database.message_repository import save_message, get_messages
 
 from database.user_repository import find_user
+from database.chat_repository import create_chat, get_user_chats
+from database.user_repository import find_user, create_user, search_users
 
 
 class ChatServer:
@@ -67,16 +69,17 @@ class ChatServer:
             username = payload.get("name")
             password = payload.get("password")
 
-            # BASİT KONTROL: Admin/1234 ise başarılı sayalım
             user=find_user(username)
             if user and user["password"] == password:
+                user_chats = get_user_chats(username)
                 response = {
                     "type": "login_response",
                     "payload": {
                         "status": "success",
                         "message": f"Hoş geldin {user['fullname']}!",
                         "user_id": user["user_id"],
-                        "username": username
+                        "username": username,
+                        "chats": user_chats
                     }
                 }
             else:
@@ -95,6 +98,7 @@ class ChatServer:
                 username=payload.get("username"),
                 password=payload.get("password"),
                 fullname=payload.get("fullname"),
+                tel=payload.get("tel", ""),
                 email=payload.get("email")
             )
             response = {
@@ -122,12 +126,13 @@ class ChatServer:
 
         elif msg_type == "create_group_request":
             payload = packet.get("payload", {})
-            group_name = packet.get("payload").get("group_name")
-
+            group_name = payload.get("group_name")
             members = payload.get("members", [])
+            creator_id = payload.get("creator_id")
 
             # Terminalde görmek için ekrana yazdırıyoruz (İleride DB'ye eklenecek)
             print(f"[YENİ GRUP İSTEĞİ] Grup Adı: '{group_name}' | Seçilen Kişiler: {members}")
+            create_chat(group_name, members, is_group=True)
 
             # Burada veritabanına kayıt işlemi yapılabilir
             response = {
@@ -151,10 +156,48 @@ class ChatServer:
             }
             self.send_packet(conn, response)
 
+        elif msg_type == "search_users_request":
+            payload = packet.get("payload", {})
+            query = payload.get("query", "")
+            requester = payload.get("username", "")
+
+            results = search_users(query, exclude_username=requester)
+
+            response = {
+                "type": "search_users_response",
+                "payload": {
+                    "status": "success",
+                    "results": results
+                }
+            }
+            self.send_packet(conn, response)
+
+        elif msg_type == "create_chat_request":
+            payload = packet.get("payload", {})
+            chat_name = payload.get("chat_name")
+            members = payload.get("members", [])
+            is_group = payload.get("is_group", False)
+
+            try:
+                create_chat(chat_name, members, is_group=is_group)
+                print(f"[SOHBET] '{chat_name}' oluşturuldu, üyeler: {members}")
+                response = {
+                    "type": "create_chat_response",
+                    "payload": {"status": "success", "chat_name": chat_name}
+                }
+            except Exception as e:
+                print(f"[SOHBET HATA] {e}")
+                response = {
+                    "type": "create_chat_response",
+                    "payload": {"status": "fail", "chat_name": chat_name}
+                }
+            self.send_packet(conn, response)
+
     def send_packet(self, conn, packet_dict):
         """Senin Protocol.py yapına uygun şekilde gönderim yapar."""
         json_data = json.dumps(packet_dict) + "<END>"
         conn.sendall(json_data.encode('utf-8'))
+
 
 if __name__ == "__main__":
     server = ChatServer()

@@ -1,11 +1,13 @@
 from PyQt5.QtWidgets import QMessageBox
 
 class LogRegController:
-    def __init__(self, stacked_widget, login_page, register_page, logreg_service):
+    def __init__(self, stacked_widget, login_page, register_page, logreg_service, on_login_success=None):
         self.stacked_widget = stacked_widget
         self.login_page = login_page
         self.register_page = register_page
         self.logreg_service = logreg_service
+
+        self.on_login_success = on_login_success
 
         # Sinyal bağlantıları
         self.logreg_service.login_response_signal.connect(self.on_login_response_received)
@@ -39,6 +41,7 @@ class LogRegController:
         username = self.register_page.username_input.text()  # bunu ekleyeceğiz
         password = self.register_page.password_input.text()
         confirm = self.register_page.password_confirm_input.text()
+        tel = self.register_page.phone_input.text()
 
         print(
             f"[DEBUG] fullname={fullname}, email={email}, username={username}, password={password}, confirm={confirm}")
@@ -54,13 +57,16 @@ class LogRegController:
         print("[DEBUG] send_register_request çağrılıyor...")
 
 
-        self.logreg_service.send_register_request(username, password, fullname, email)
+        self.logreg_service.send_register_request(username, password, fullname, email, tel)
 
     def on_login_response_received(self, server_payload):
         status = server_payload.get("status")
         if status == "success":
             QMessageBox.information(self.login_page, "Başarılı", "Sohbet ekranına yönlendiriliyorsunuz...")
             self.stacked_widget.setCurrentIndex(2)
+            # ← ekle
+            if self.on_login_success:
+                self.on_login_success(server_payload)
         else:
             hata_mesaji = server_payload.get("message", "Bilinmeyen bir hata oluştu.")
             QMessageBox.warning(self.login_page, "Giriş Başarısız", hata_mesaji)

@@ -32,8 +32,10 @@ class MainApplicationWindow(QMainWindow):
         self.chat_client = Client(services={})
 
         # 4. Servisler
-        self.logreg_service = LogRegService(self.chat_client)
         self.chat_service = ChatService(self.chat_client)
+        self.logreg_service = LogRegService(self.chat_client, chat_service=self.chat_service)
+
+
 
         # 5. Servisleri client'a tanıt (tek seferde)
         self.chat_client.register_services({
@@ -46,7 +48,8 @@ class MainApplicationWindow(QMainWindow):
             self.stacked_widget,
             self.login_page,
             self.register_page,
-            self.logreg_service
+            self.logreg_service,
+            on_login_success=self.on_login_success
         )
         self.chat_controller = ChatController(self.main_page, self.chat_service)
 
@@ -58,6 +61,10 @@ class MainApplicationWindow(QMainWindow):
             self.listen_thread.daemon = True
             self.listen_thread.start()
 
+    def on_login_success(self, user_info: dict):
+        """Login başarılı olunca çağrılır."""
+        self.current_user = user_info  # {"user_id": 1, "username": "nisa", ...}
+        self.chat_controller.set_current_user(user_info)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

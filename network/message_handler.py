@@ -25,8 +25,14 @@ class MessageHandler:
         elif msg_type == "create_group_response":
             self.services['chat_service'].handle_server_response(payload)
 
+        elif msg_type == "search_users_response":  # ← ekle
+            self.services['chat_service'].handle_search_response(payload)
+
         elif msg_type == "error":
             print("[HATA] Sunucudan hatalı paket geldi.")
+
+        elif msg_type == "create_chat_response":
+            pass  # şimdilik bir şey yapmaya gerek yok
 
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")

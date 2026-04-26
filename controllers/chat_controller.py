@@ -55,20 +55,25 @@ class ChatController():
     def __init__(self, main_page, chat_service):
         self.main_page = main_page
         self.chat_service = chat_service
+        self.current_user_id = None
+        self.current_username = None
         self.loaded_chats = set()
 
         self.main_page.send_message_signal.connect(self.handle_send_message)
         self.chat_service.receive_message_signal.connect(self.on_message_received)
         self.main_page.load_history_signal.connect(self.load_history_for_chat)
+        self.main_page.delete_chat_signal.connect(self.handle_delete_chat)
+        self.main_page.block_user_signal.connect(self.handle_block_user)
+        self.main_page.search_query_signal.connect(self.handle_search)
+        self.main_page.start_chat_signal.connect(self.handle_start_chat)
 
         # Artı butonuna tıklanma olayını bağla
         self.main_page.add_chat_btn.clicked.connect(self.show_create_group_dialog)
 
         # Servisten gelecek cevabı bekle
         self.chat_service.create_group_response_signal.connect(self.on_group_created)
-
-        self.main_page.delete_chat_signal.connect(self.handle_delete_chat)
-        self.main_page.block_user_signal.connect(self.handle_block_user)
+        self.chat_service.user_chats_loaded_signal.connect(self.load_user_chats)
+        self.chat_service.search_results_signal.connect(self.main_page.show_search_results)
 
         from PyQt5.QtCore import Qt  # En üste import etmeyi unutma
         self.chat_service.delete_chat_response_signal.connect(self.on_chat_deleted, Qt.QueuedConnection)
@@ -114,15 +119,16 @@ class ChatController():
             QMessageBox.warning(self.main_page, "Hata", "Grup oluşturulamadı.")
 
     def handle_send_message(self, chat_name, text):
+        print(f"[DEBUG] Mesaj gönderiliyor: chat_name={chat_name}, text={text}, sender_id={self.current_user_id}")
         # Kullanıcı ID'sini şimdilik sabit "1" veriyoruz, ileride Login'den gelen ID olacak
-        self.chat_service.send_chat_message(chat_name, text, sender_id=1)
+        self.chat_service.send_chat_message(chat_name, text, sender_id=self.current_user_id or 1)
 
     def on_message_received(self, payload: dict):
         chat_name = payload.get("chat_name")
         content = payload.get("content")
         sender_id = payload.get("sender_id")
         status = payload.get("status", "delivered")
-        is_mine = (sender_id == 1)  # ileride login'den gelen ID ile karşılaştırılacak
+        is_mine = (sender_id == self.current_user_id)  # ileride login'den gelen ID ile karşılaştırılacak
 
         self.main_page.add_message_to_ui(chat_name, content, is_mine, status)
 
@@ -132,7 +138,7 @@ class ChatController():
 
         messages = self.chat_service.load_chat_history(chat_name)
         for msg in messages:
-            is_mine = (msg.get("sender_id") == 1)
+            is_mine = (msg.get("sender_id") == self.current_user_id)
             status = msg.get("status", "delivered")
             self.main_page.add_message_to_ui(
                 msg.get("chat_name"),
@@ -140,5 +146,37 @@ class ChatController():
                 is_mine,
                 status
             )
-
         self.loaded_chats.add(chat_name)
+
+    def set_current_user(self, user_info: dict):
+        self.current_user_id = user_info.get("user_id")
+        self.current_username = user_info.get("username")
+        # is_mine kontrolünü artık bu id ile yap
+
+    def load_user_chats(self, chats: list):
+        for chat in chats:
+            chat_name = chat.get("chat_name")
+            # Zaten listede varsa ekleme
+            already_exists = False
+            for i in range(self.main_page.chat_screens_stack.count()):
+                widget = self.main_page.chat_screens_stack.widget(i)
+                if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                    already_exists = True
+                    break
+
+            if not already_exists:
+                self.main_page.add_new_chat_to_ui(chat_name)
+                # Geçmişi de yükle
+                self.loaded_chats.discard(chat_name)  # tekrar yüklenmesi için
+                self.load_history_for_chat(chat_name)
+
+    def handle_search(self, query: str):
+        print(f"[DEBUG] Arama: {query}, kullanıcı: {self.current_username}")
+        self.chat_service.send_search_request(query, self.current_username or "")
+
+    def handle_start_chat(self, username: str):
+        self.main_page.search_input.clear()
+        self.main_page.clear_search_results()
+
+        self.chat_service.send_create_chat_request(username, self.current_username)
+        self.main_page.add_new_chat_to_ui(username)
