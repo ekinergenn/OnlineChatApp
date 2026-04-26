@@ -121,9 +121,10 @@ class ChatController():
         chat_name = payload.get("chat_name")
         content = payload.get("content")
         sender_id = payload.get("sender_id")
+        status = payload.get("status", "delivered")
         is_mine = (sender_id == 1)  # ileride login'den gelen ID ile karşılaştırılacak
 
-        self.main_page.add_message_to_ui(chat_name, content, is_mine)
+        self.main_page.add_message_to_ui(chat_name, content, is_mine, status)
 
     def load_history_for_chat(self, chat_name: str):
         if chat_name in self.loaded_chats:
@@ -132,10 +133,12 @@ class ChatController():
         messages = self.chat_service.load_chat_history(chat_name)
         for msg in messages:
             is_mine = (msg.get("sender_id") == 1)
+            status = msg.get("status", "delivered")
             self.main_page.add_message_to_ui(
                 msg.get("chat_name"),
                 msg.get("content"),
-                is_mine
+                is_mine,
+                status
             )
 
         self.loaded_chats.add(chat_name)

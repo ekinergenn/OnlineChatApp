@@ -411,7 +411,7 @@ class MainPageUI(QWidget):
             self.send_message_signal.emit(chat_name, text)
             input_field.clear()  # Gönderdikten sonra kutuyu temizle
 
-    def add_message_to_ui(self, chat_name, content, is_mine=True):
+    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered"):
         for i in range(self.chat_screens_stack.count()):
             widget = self.chat_screens_stack.widget(i)
             if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
@@ -422,7 +422,7 @@ class MainPageUI(QWidget):
                 stretch_item = msg_layout.takeAt(msg_layout.count() - 1)
 
                 # Baloncuğu ekle
-                bubble = self._create_message_bubble(content, is_mine)
+                bubble = self._create_message_bubble(content, is_mine, status)
                 msg_layout.addWidget(bubble)
 
                 # Stretch'i geri koy
@@ -435,12 +435,19 @@ class MainPageUI(QWidget):
                 )
                 break
 
-    def _create_message_bubble(self, content, is_mine):
+    def _create_message_bubble(self, content, is_mine, status="delivered"):
         wrapper = QWidget()
         wrapper.setStyleSheet("background: transparent;")
         w_layout = QHBoxLayout(wrapper)
         w_layout.setContentsMargins(0, 0, 0, 0)
         w_layout.setSpacing(0)
+
+        # Balon + durum ikonu için dikey container
+        bubble_container = QWidget()
+        bubble_container.setStyleSheet("background: transparent;")
+        b_layout = QVBoxLayout(bubble_container)
+        b_layout.setContentsMargins(0, 0, 0, 0)
+        b_layout.setSpacing(2)
 
         bubble = QLabel(content)
         bubble.setWordWrap(True)
@@ -452,14 +459,34 @@ class MainPageUI(QWidget):
                 background-color: #dcf8c6; color: #111b21;
                 border-radius: 8px; padding: 8px 12px; font-size: 14px;
             """)
+
+            # Durum ikonu (sadece kendi mesajlarımızda)
+            status_label = QLabel()
+            if status == "sent":
+                status_label.setText("✓")
+                status_label.setStyleSheet("color: #667781; font-size: 11px;")
+            elif status == "delivered":
+                status_label.setText("✓✓")
+                status_label.setStyleSheet("color: #667781; font-size: 11px;")
+            elif status == "read":
+                status_label.setText("✓✓")
+                status_label.setStyleSheet("color: #3b82f6; font-size: 11px; font-weight: bold;")
+
+            status_label.setAlignment(Qt.AlignRight)
+
+            b_layout.addWidget(bubble)
+            b_layout.addWidget(status_label)
+
             w_layout.addStretch()
-            w_layout.addWidget(bubble)
+            w_layout.addWidget(bubble_container)
         else:
             bubble.setStyleSheet("""
                 background-color: #ffffff; color: #111b21;
                 border-radius: 8px; padding: 8px 12px; font-size: 14px;
             """)
-            w_layout.addWidget(bubble)
+            b_layout.addWidget(bubble)
+
+            w_layout.addWidget(bubble_container)
             w_layout.addStretch()
 
         return wrapper
