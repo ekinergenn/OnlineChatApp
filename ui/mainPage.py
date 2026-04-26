@@ -1,7 +1,8 @@
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton,
-    QVBoxLayout, QHBoxLayout, QFrame, QScrollArea, QSizePolicy, QStackedWidget
+    QVBoxLayout, QHBoxLayout, QFrame, QScrollArea, QSizePolicy, QStackedWidget,
+    QMenu, QAction, QMessageBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
@@ -128,15 +129,15 @@ class MainPageUI(QWidget):
         title_label = QLabel("Sohbetler")
         title_label.setStyleSheet("font-size: 22px; font-weight: bold; color: #111b21;")
 
-        add_chat_btn = QPushButton("➕")
-        add_chat_btn.setFixedSize(35, 35)
-        add_chat_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        add_chat_btn.setStyleSheet(
+        self.add_chat_btn = QPushButton("➕")
+        self.add_chat_btn.setFixedSize(35, 35)
+        self.add_chat_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        self.add_chat_btn.setStyleSheet(
             "QPushButton { border: none; background-color: #f0f2f5; border-radius: 17px; } QPushButton:hover { background-color: #e4e6eb; }")
 
         header_layout.addWidget(title_label)
         header_layout.addStretch()
-        header_layout.addWidget(add_chat_btn)
+        header_layout.addWidget(self.add_chat_btn)
         chat_layout.addWidget(header_frame)
 
         # --- Arama Çubuğu ---
@@ -321,6 +322,43 @@ class MainPageUI(QWidget):
         top_layout.addWidget(name_label)
         top_layout.addStretch()
 
+        delete_btn = QPushButton("🗑️")
+        delete_btn.setFixedSize(35, 35)
+        delete_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        delete_btn.setStyleSheet("""
+                    QPushButton { border: none; font-size: 18px; border-radius: 17px; background-color: transparent;}
+                    QPushButton:hover { background-color: #ffebee; } /* Üzerine gelince hafif kırmızı */
+                """)
+        # Çöp kutusuna tıklanınca uyarı fonksiyonunu çağır
+        delete_btn.clicked.connect(lambda: self.confirm_delete_chat(contact_name))
+
+        # --- YENİ EKLENEN: 3 NOKTA (SEÇENEKLER) ---
+        options_btn = QPushButton("⋮")
+        options_btn.setFixedSize(35, 35)
+        options_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        options_btn.setStyleSheet("""
+                    QPushButton { border: none; font-size: 22px; font-weight: bold; border-radius: 17px; background-color: transparent;}
+                    QPushButton:hover { background-color: #e4e6eb; }
+                    QPushButton::menu-indicator { image: none; } /* PyQt'nin otomatik koyduğu çirkin oku gizler */
+                """)
+
+        menu = QMenu()
+        menu.setStyleSheet("""
+                    QMenu { background-color: #ffffff; border: 1px solid #d1d7db; border-radius: 5px; }
+                    QMenu::item { padding: 10px 20px; font-size: 14px; color: #111b21; }
+                    QMenu::item:selected { background-color: #f0f2f5; }
+                """)
+
+        block_action = QAction("🚫 Kişiyi Engelle", chat_frame)
+        # İleride bunu Controller'a bağlayıp servise (block_service) göndereceğiz
+        menu.addAction(block_action)
+
+        options_btn.setMenu(menu)  # Menüyü 3 nokta butonuna bağla
+
+        # Butonları üst bara (sağ köşeye) ekle
+        top_layout.addWidget(delete_btn)
+        top_layout.addWidget(options_btn)
+
         # Mesajların listeleneceği orta alan
         chat_area = QLabel(f"<b>{contact_name}</b> ile mesajlaşma geçmişiniz burada görünecek.")
         chat_area.setAlignment(Qt.AlignCenter)
@@ -347,6 +385,43 @@ class MainPageUI(QWidget):
         layout.addWidget(bottom_bar)
 
         return chat_frame
+
+    def confirm_delete_chat(self, chat_name):
+        """Çöp kutusuna basıldığında sohbeti silme onayı ister."""
+        reply = QMessageBox.question(
+            self,
+            'Sohbeti Sil',
+            f"'{chat_name}' ile olan sohbeti silmek istediğinize emin misiniz?\nBu işlem geri alınamaz.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            # Şimdilik sadece terminale yazdırıyoruz, ileride Controller'dan sunucuya sildireceğiz
+            print(f"[{chat_name}] sohbeti silindi!")
+
+    def add_new_chat_to_ui(self, chat_name):
+        """Sunucudan başarılı yanıt gelince yeni grubu sol listeye ve sağ ekrana ekler."""
+        # 1. Yeni eklenecek ekranın index numarasını hesapla
+        new_stack_index = self.chat_screens_stack.count()
+
+        # 2. Sol taraftaki kaydırılabilir listeye yeni butonu ekle
+        # (create_chat_item fonksiyonunuza uygun parametreler gönderiyoruz)
+        new_chat_item = self.create_chat_item(
+            name=chat_name,
+            last_message="Grubu oluşturdunuz.",
+            time="Şimdi",
+            is_unread=False,
+            stack_index=new_stack_index
+        )
+        self.scroll_layout.insertWidget(0, new_chat_item)  # En üste ekler
+
+        # 3. Sağ taraftaki sohbet alanına bu gruba ait yeni bir ekran ekle
+        new_chat_screen = self.create_individual_chat_screen(chat_name)
+        self.chat_screens_stack.addWidget(new_chat_screen)
+
+        # 4. Hemen yeni açılan grubun sohbet ekranına geçiş yap
+        self.chat_screens_stack.setCurrentIndex(new_stack_index)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

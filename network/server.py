@@ -83,6 +83,25 @@ class ChatServer:
             
             self.send_packet(conn, response)
 
+        elif msg_type == "create_group_request":
+            payload = packet.get("payload", {})
+            group_name = packet.get("payload").get("group_name")
+
+            members = payload.get("members", [])
+
+            # Terminalde görmek için ekrana yazdırıyoruz (İleride DB'ye eklenecek)
+            print(f"[YENİ GRUP İSTEĞİ] Grup Adı: '{group_name}' | Seçilen Kişiler: {members}")
+
+            # Burada veritabanına kayıt işlemi yapılabilir
+            response = {
+                "type": "create_group_response",
+                "payload": {
+                    "status": "success",
+                    "group_name": group_name
+                }
+            }
+            self.send_packet(conn, response)
+
     def send_packet(self, conn, packet_dict):
         """Senin Protocol.py yapına uygun şekilde gönderim yapar."""
         json_data = json.dumps(packet_dict) + "<END>"

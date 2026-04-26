@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget
-import threading 
+import threading
 from network import Client
 from ui import LoginPageUI,RegisterPageUI,MainPageUI
 from services import LogRegService
@@ -55,6 +55,23 @@ class MainApplicationWindow(QMainWindow):
             self.listen_thread = threading.Thread(target=self.chat_client.listen_for_messages)
             self.listen_thread.daemon = True
             self.listen_thread.start()
+
+        # main.py içindeki ilgili yerlere ekleyin:
+        from services.chat_service import ChatService
+        from controllers.chat_controller import ChatController
+
+        # ... (servisler kısmında)
+        self.chat_service = ChatService(self.chat_client)
+
+        # ... (services_dict içinde)
+        services_dict = {
+            'logreg_service': self.logreg_service,
+            'chat_service': self.chat_service  # MessageHandler'ın tanıması için
+        }
+        self.chat_client.register_services(services_dict)
+
+        # ... (controller oluşturma kısmında)
+        self.chat_controller = ChatController(self.main_page, self.chat_service)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
