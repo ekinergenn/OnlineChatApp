@@ -1,6 +1,11 @@
 import socket
 import threading
 import json
+from database.user_repository import find_user, create_user
+from database.message_repository import save_message, get_messages
+
+from database.user_repository import find_user
+
 
 class ChatServer:
     def __init__(self, host='127.0.0.1', port=12345):
@@ -59,17 +64,19 @@ class ChatServer:
         # Senin logReg_service içindeki paket yapına uygun kontrol
         if msg_type == "login_request":
             payload = packet.get("payload", {})
-            name = payload.get("name")
+            username = payload.get("name")
             password = payload.get("password")
 
             # BASİT KONTROL: Admin/1234 ise başarılı sayalım
-            if name == "admin" and password == "1234":
+            user=find_user(username)
+            if user and user["password"] == password:
                 response = {
                     "type": "login_response",
                     "payload": {
                         "status": "success",
-                        "message": "Hoş geldin admin!",
-                        "user_id": 1
+                        "message": f"Hoş geldin {user['fullname']}!",
+                        "user_id": user["user_id"],
+                        "username": username
                     }
                 }
             else:
@@ -80,7 +87,37 @@ class ChatServer:
                         "message": "Kullanıcı adı veya şifre hatalı!"
                     }
                 }
-            
+            self.send_packet(conn, response)
+
+        elif msg_type == "register_request":
+            payload = packet.get("payload", {})
+            success = create_user(
+                username=payload.get("username"),
+                password=payload.get("password"),
+                fullname=payload.get("fullname"),
+                email=payload.get("email")
+            )
+            response = {
+                "type": "register_response",
+                "payload": {
+                    "status": "success" if success else "fail",
+                    "message": "Kayıt başarılı!" if success else "Bu kullanıcı adı zaten alınmış."
+                }
+            }
+            self.send_packet(conn, response)
+
+        elif msg_type == "chat_message":
+            payload = packet.get("payload", {})
+            saved = save_message(
+                chat_name=payload.get("chat_name"),
+                sender=payload.get("sender"),
+                content=payload.get("content"),
+                sender_id=payload.get("sender_id")
+            )
+            response = {
+                "type": "chat_message",
+                "payload": saved  # kaydedilen mesajı geri dön (message_id ve status ile)
+            }
             self.send_packet(conn, response)
 
         elif msg_type == "create_group_request":

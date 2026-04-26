@@ -1,3 +1,7 @@
+from .message import Message
+from .chat import Chat
+from .community import Community
+from .user import User
 """ 
 +---------------------------+
 |           User            |

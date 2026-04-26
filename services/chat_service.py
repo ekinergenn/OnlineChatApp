@@ -1,16 +1,35 @@
 from PyQt5.QtCore import QObject, pyqtSignal
+from models.message import Message
+import time # Timestamp için
 
 class ChatService(QObject):
     # Sunucudan cevap gelince arayüzü güncellemek için sinyal
     create_group_response_signal = pyqtSignal(dict)
     delete_chat_response_signal = pyqtSignal(dict)
+    receive_message_signal = pyqtSignal(dict)
 
     def __init__(self, client):
         super().__init__()
         self.client = client
 
-    def send_create_group_request(self, group_name: str, creator_id: int, members: list):
-        """Sunucuya yeni bir grup oluşturma isteği gönderir."""
+    def send_chat_message(self, chat_name: str, content: str, sender_id: int):
+        """Arayüzden gelen metni paketleyip sunucuya gönderir."""
+        packet = {
+            "type": "chat_message",
+            "payload": {
+                "chat_name": chat_name,
+                "content": content,
+                "sender_id": sender_id,
+                "timestamp": int(time.time())
+            }
+        }
+        self.client.send_data(packet)
+
+    def receive_new_message(self, payload: dict):
+        # Controller'a modeli fırlat
+        self.receive_message_signal.emit(payload)
+
+    def send_create_group_request(self, group_name: str, members: list, creator_id: int):
         packet = {
             "type": "create_group_request",
             "payload": {

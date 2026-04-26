@@ -22,6 +22,7 @@ class CreateGroupDialog(QDialog):
         self.user_list = QListWidget()
         self.user_list.setStyleSheet("border: 1px solid #d1d7db; border-radius: 8px;")
 
+
         # Gerçek uygulamada bu liste sunucudan çekilen arkadaş listesi olmalı
         dummy_friends = ["Ahmet Yılmaz", "Ayşe Kaya", "Mehmet", "Hoca"]
 
@@ -54,6 +55,9 @@ class ChatController():
     def __init__(self, main_page, chat_service):
         self.main_page = main_page
         self.chat_service = chat_service
+
+        self.main_page.send_message_signal.connect(self.handle_send_message)
+        self.chat_service.receive_message_signal.connect(self.on_message_received)
 
         # Artı butonuna tıklanma olayını bağla
         self.main_page.add_chat_btn.clicked.connect(self.show_create_group_dialog)
@@ -106,3 +110,15 @@ class ChatController():
             QMessageBox.information(self.main_page, "Başarılı", f"'{group_name}' grubu oluşturuldu!")
         else:
             QMessageBox.warning(self.main_page, "Hata", "Grup oluşturulamadı.")
+
+    def handle_send_message(self, chat_name, text):
+        # Kullanıcı ID'sini şimdilik sabit "1" veriyoruz, ileride Login'den gelen ID olacak
+        self.chat_service.send_chat_message(chat_name, text, sender_id=1)
+
+    def on_message_received(self, payload: dict):
+        chat_name = payload.get("chat_name")
+        content = payload.get("content")
+        sender_id = payload.get("sender_id")
+        is_mine = (sender_id == 1)  # ileride login'den gelen ID ile karşılaştırılacak
+
+        self.main_page.add_message_to_ui(chat_name, content, is_mine)

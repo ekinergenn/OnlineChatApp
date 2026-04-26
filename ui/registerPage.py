@@ -15,7 +15,7 @@ class RegisterPageUI(QWidget):
         self.main_layout.setAlignment(Qt.AlignCenter)
 
         self.card = QFrame()
-        self.card.setFixedSize(450, 680)
+        self.card.setFixedSize(450, 740)
         self.card.setStyleSheet("QFrame { background-color: #ffffff; border-radius: 20px; }")
 
         shadow = QGraphicsDropShadowEffect()
@@ -46,6 +46,11 @@ class RegisterPageUI(QWidget):
         self.fullname_input.setPlaceholderText("Adınız ve Soyadınız")
         self.fullname_input.setStyleSheet(input_style)
         card_layout.addWidget(self.fullname_input)
+
+        self.username_input = QLineEdit()
+        self.username_input.setPlaceholderText("Kullanıcı Adı")
+        self.username_input.setStyleSheet(input_style)
+        card_layout.addWidget(self.username_input)
 
         self.email_input = QLineEdit()
         self.email_input.setPlaceholderText("E-posta Adresiniz")

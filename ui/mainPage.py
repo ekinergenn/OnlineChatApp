@@ -23,6 +23,8 @@ class MainPageUI(QWidget):
     delete_chat_signal = pyqtSignal(str)
     block_user_signal = pyqtSignal(str)
 
+    send_message_signal = pyqtSignal(str, str)
+
     def __init__(self):
         super().__init__()
         self.init_ui()
@@ -194,6 +196,7 @@ class MainPageUI(QWidget):
     def create_chat_item(self, name, last_message, time, is_unread, stack_index):
         # Tıklanabilir ClickableFrame kullanıyoruz
         item_frame = ClickableFrame()
+        item_frame.contact_name = name
         item_frame.setFixedHeight(75)
         item_frame.setCursor(QCursor(Qt.PointingHandCursor))
         item_frame.setStyleSheet("""
@@ -255,136 +258,111 @@ class MainPageUI(QWidget):
 
         return item_frame
 
-    def create_chat_screens_stack(self):
-        # 3. SÜTUN: KİŞİYE GÖRE DEĞİŞEN SOHBET EKRANI STACK'İ
-        self.chat_screens_stack = QStackedWidget()
-        
-        # İndeks 0: Hoş Geldin Ekranı (Boş Durum)
-        welcome_screen = self.create_welcome_screen()
-        self.chat_screens_stack.addWidget(welcome_screen)
-
-        # İndeks 1'den itibaren: Listede yer alan her sohbet için özel ekran oluşturuyoruz
-        for name, msg, time, unread in self.dummy_chats:
-            specific_chat_screen = self.create_individual_chat_screen(name)
-            self.chat_screens_stack.addWidget(specific_chat_screen)
-
-        self.chats_page_layout.addWidget(self.chat_screens_stack)
-
-    def create_welcome_screen(self):
-        welcome_frame = QFrame()
-        welcome_frame.setStyleSheet("background-color: #f0f2f5;")
-        layout = QVBoxLayout(welcome_frame)
-        layout.addStretch()
-
-        big_icon = QLabel("💻")
-        big_icon.setStyleSheet("font-size: 80px; color: #667781;")
-        big_icon.setAlignment(Qt.AlignCenter)
-        layout.addWidget(big_icon)
-
-        title = QLabel("OnlineChat Masaüstü")
-        title.setStyleSheet("font-size: 28px; color: #111b21; font-weight: 300; margin-top: 20px;")
-        title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
-
-        subtitle = QLabel("Uçtan uca şifrelenmiş mesajlarınızı gönderin ve alın.<br>Sohbet başlatmak için soldan bir kişiyi seçin.")
-        subtitle.setStyleSheet("font-size: 14px; color: #667781; line-height: 1.5; margin-top: 10px;")
-        subtitle.setAlignment(Qt.AlignCenter)
-        layout.addWidget(subtitle)
-
-        layout.addStretch()
-
-        security_note = QLabel("🔒 Mesajlarınız uçtan uca şifrelenir")
-        security_note.setStyleSheet("font-size: 12px; color: #8696a0; margin-bottom: 20px;")
-        security_note.setAlignment(Qt.AlignCenter)
-        layout.addWidget(security_note)
-
-        return welcome_frame
-
     def create_individual_chat_screen(self, contact_name):
-        # Kişiye veya gruba tıklandığında açılacak basit sohbet arayüzü
         chat_frame = QFrame()
-        chat_frame.setStyleSheet("background-color: #efeae2;") # Klasik sohbet arka plan rengi
-        
+        chat_frame.setStyleSheet("background-color: #efeae2;")
+        chat_frame.contact_name = contact_name  # ← arama için etiket
+
         layout = QVBoxLayout(chat_frame)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        # Üst bar (Kişi bilgisi)
+        # ── ÜST BAR ──────────────────────────────────────────
         top_bar = QFrame()
         top_bar.setFixedHeight(60)
         top_bar.setStyleSheet("background-color: #f0f2f5; border-bottom: 1px solid #d1d7db;")
         top_layout = QHBoxLayout(top_bar)
-        
+        top_layout.setContentsMargins(10, 0, 10, 0)
+
         avatar = QLabel("👤")
         avatar.setFixedSize(40, 40)
         avatar.setStyleSheet("background-color: #dfe5e7; border-radius: 20px; font-size: 20px;")
-        
+        avatar.setAlignment(Qt.AlignCenter)
+
         name_label = QLabel(contact_name)
         name_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #111b21;")
-        
-        top_layout.addWidget(avatar)
-        top_layout.addWidget(name_label)
-        top_layout.addStretch()
 
         delete_btn = QPushButton("🗑️")
         delete_btn.setFixedSize(35, 35)
         delete_btn.setCursor(QCursor(Qt.PointingHandCursor))
         delete_btn.setStyleSheet("""
-                    QPushButton { border: none; font-size: 18px; border-radius: 17px; background-color: transparent;}
-                    QPushButton:hover { background-color: #ffebee; } /* Üzerine gelince hafif kırmızı */
-                """)
-        # Çöp kutusuna tıklanınca uyarı fonksiyonunu çağır
+            QPushButton { border: none; font-size: 18px; border-radius: 17px; background-color: transparent; }
+            QPushButton:hover { background-color: #ffebee; }
+        """)
         delete_btn.clicked.connect(lambda: self.confirm_delete_chat(contact_name))
 
-        # --- YENİ EKLENEN: 3 NOKTA (SEÇENEKLER) ---
         options_btn = QPushButton("⋮")
         options_btn.setFixedSize(35, 35)
         options_btn.setCursor(QCursor(Qt.PointingHandCursor))
         options_btn.setStyleSheet("""
-                    QPushButton { border: none; font-size: 22px; font-weight: bold; border-radius: 17px; background-color: transparent;}
-                    QPushButton:hover { background-color: #e4e6eb; }
-                    QPushButton::menu-indicator { image: none; } /* PyQt'nin otomatik koyduğu çirkin oku gizler */
-                """)
-
+            QPushButton { border: none; font-size: 22px; font-weight: bold; border-radius: 17px; background-color: transparent; }
+            QPushButton:hover { background-color: #e4e6eb; }
+            QPushButton::menu-indicator { image: none; }
+        """)
         menu = QMenu()
         menu.setStyleSheet("""
-                    QMenu { background-color: #ffffff; border: 1px solid #d1d7db; border-radius: 5px; }
-                    QMenu::item { padding: 10px 20px; font-size: 14px; color: #111b21; }
-                    QMenu::item:selected { background-color: #f0f2f5; }
-                """)
-
+            QMenu { background-color: #ffffff; border: 1px solid #d1d7db; border-radius: 5px; }
+            QMenu::item { padding: 10px 20px; font-size: 14px; color: #111b21; }
+            QMenu::item:selected { background-color: #f0f2f5; }
+        """)
         block_action = QAction("🚫 Kişiyi Engelle", chat_frame)
         block_action.triggered.connect(lambda: self.block_user_signal.emit(contact_name))
         menu.addAction(block_action)
+        options_btn.setMenu(menu)
 
-        options_btn.setMenu(menu)  # Menüyü 3 nokta butonuna bağla
-
-        # Butonları üst bara (sağ köşeye) ekle
+        top_layout.addWidget(avatar)
+        top_layout.addWidget(name_label)
+        top_layout.addStretch()
         top_layout.addWidget(delete_btn)
         top_layout.addWidget(options_btn)
 
-        # Mesajların listeleneceği orta alan
-        chat_area = QLabel(f"<b>{contact_name}</b> ile mesajlaşma geçmişiniz burada görünecek.")
-        chat_area.setAlignment(Qt.AlignCenter)
-        chat_area.setStyleSheet("font-size: 14px; color: #667781;")
+        # ── MESAJ ALANI (kaydırılabilir) ─────────────────────
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
 
-        # Alt bar (Mesaj yazma alanı)
+        msg_container = QWidget()
+        msg_container.setStyleSheet("background-color: #efeae2;")
+
+        msg_layout = QVBoxLayout(msg_container)
+        msg_layout.setContentsMargins(10, 10, 10, 10)
+        msg_layout.setSpacing(6)
+        msg_layout.addStretch()  # mesajları aşağıdan yukarı iter
+
+        scroll.setWidget(msg_container)
+
+        # referansları frame'e göm — sonra add_message_to_ui bulacak
+        chat_frame.msg_layout = msg_layout
+        chat_frame.scroll = scroll
+
+        # ── ALT BAR ──────────────────────────────────────────
         bottom_bar = QFrame()
         bottom_bar.setFixedHeight(60)
         bottom_bar.setStyleSheet("background-color: #f0f2f5;")
         bottom_layout = QHBoxLayout(bottom_bar)
-        
+        bottom_layout.setContentsMargins(10, 10, 10, 10)
+
         msg_input = QLineEdit()
         msg_input.setPlaceholderText("Bir mesaj yazın")
-        msg_input.setStyleSheet("background-color: #ffffff; border: none; border-radius: 8px; padding: 10px; font-size: 14px;")
-        
+        msg_input.setStyleSheet("""
+            background-color: #ffffff; border: none;
+            border-radius: 8px; padding: 10px; font-size: 14px;
+        """)
+
         send_btn = QPushButton("➤")
-        send_btn.setStyleSheet("font-size: 20px; border: none; color: #667781;")
-        
+        send_btn.setFixedSize(40, 40)
+        send_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        send_btn.setStyleSheet("font-size: 20px; border: none; color: #3b82f6; background: transparent;")
+
+        send_btn.clicked.connect(lambda: self.on_send_clicked(contact_name, msg_input))
+        msg_input.returnPressed.connect(lambda: self.on_send_clicked(contact_name, msg_input))
+
         bottom_layout.addWidget(msg_input)
         bottom_layout.addWidget(send_btn)
 
+        # ── HEPSİNİ ANA LAYOUT'A EKLE ────────────────────────
         layout.addWidget(top_bar)
-        layout.addWidget(chat_area)
+        layout.addWidget(scroll)  # scroll genişler, stretch alır
         layout.addWidget(bottom_bar)
 
         return chat_frame
@@ -425,6 +403,134 @@ class MainPageUI(QWidget):
 
         # 4. Hemen yeni açılan grubun sohbet ekranına geçiş yap
         self.chat_screens_stack.setCurrentIndex(new_stack_index)
+
+    def on_send_clicked(self, chat_name, input_field):
+        text = input_field.text().strip()
+        if text:  # Boş mesaj gitmesin
+            self.send_message_signal.emit(chat_name, text)
+            input_field.clear()  # Gönderdikten sonra kutuyu temizle
+
+    def add_message_to_ui(self, chat_name, content, is_mine=True):
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                msg_layout = widget.msg_layout
+                scroll = widget.scroll
+
+                # Son stretch'i geçici kaldır
+                stretch_item = msg_layout.takeAt(msg_layout.count() - 1)
+
+                # Baloncuğu ekle
+                bubble = self._create_message_bubble(content, is_mine)
+                msg_layout.addWidget(bubble)
+
+                # Stretch'i geri koy
+                msg_layout.addStretch()
+
+                # En alta kaydır
+                QApplication.processEvents()
+                scroll.verticalScrollBar().setValue(
+                    scroll.verticalScrollBar().maximum()
+                )
+                break
+
+    def _create_message_bubble(self, content, is_mine):
+        wrapper = QWidget()
+        wrapper.setStyleSheet("background: transparent;")
+        w_layout = QHBoxLayout(wrapper)
+        w_layout.setContentsMargins(0, 0, 0, 0)
+        w_layout.setSpacing(0)
+
+        bubble = QLabel(content)
+        bubble.setWordWrap(True)
+        bubble.setMaximumWidth(400)
+        bubble.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+        if is_mine:
+            bubble.setStyleSheet("""
+                background-color: #dcf8c6; color: #111b21;
+                border-radius: 8px; padding: 8px 12px; font-size: 14px;
+            """)
+            w_layout.addStretch()
+            w_layout.addWidget(bubble)
+        else:
+            bubble.setStyleSheet("""
+                background-color: #ffffff; color: #111b21;
+                border-radius: 8px; padding: 8px 12px; font-size: 14px;
+            """)
+            w_layout.addWidget(bubble)
+            w_layout.addStretch()
+
+        return wrapper
+
+    def create_chat_screens_stack(self):
+        self.chat_screens_stack = QStackedWidget()
+
+        # İndeks 0: Hoş Geldin Ekranı
+        welcome_screen = self.create_welcome_screen()
+        self.chat_screens_stack.addWidget(welcome_screen)
+
+        # İndeks 1'den itibaren: Her sohbet için ekran
+        for name, msg, time, unread in self.dummy_chats:
+            specific_chat_screen = self.create_individual_chat_screen(name)
+            self.chat_screens_stack.addWidget(specific_chat_screen)
+
+        self.chats_page_layout.addWidget(self.chat_screens_stack)
+
+    def create_welcome_screen(self):
+        welcome_frame = QFrame()
+        welcome_frame.setStyleSheet("background-color: #f0f2f5;")
+        layout = QVBoxLayout(welcome_frame)
+        layout.addStretch()
+
+        big_icon = QLabel("💻")
+        big_icon.setStyleSheet("font-size: 80px; color: #667781;")
+        big_icon.setAlignment(Qt.AlignCenter)
+        layout.addWidget(big_icon)
+
+        title = QLabel("OnlineChat Masaüstü")
+        title.setStyleSheet("font-size: 28px; color: #111b21; font-weight: 300; margin-top: 20px;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        subtitle = QLabel(
+            "Uçtan uca şifrelenmiş mesajlarınızı gönderin ve alın.<br>Sohbet başlatmak için soldan bir kişiyi seçin.")
+        subtitle.setStyleSheet("font-size: 14px; color: #667781; line-height: 1.5; margin-top: 10px;")
+        subtitle.setAlignment(Qt.AlignCenter)
+        layout.addWidget(subtitle)
+
+        layout.addStretch()
+
+        security_note = QLabel("🔒 Mesajlarınız uçtan uca şifrelenir")
+        security_note.setStyleSheet("font-size: 12px; color: #8696a0; margin-bottom: 20px;")
+        security_note.setAlignment(Qt.AlignCenter)
+        layout.addWidget(security_note)
+
+        return welcome_frame
+
+    def remove_chat_from_ui(self, chat_name):
+        # 1. Sol listedeki chat item'ı bul ve kaldır
+        for i in range(self.scroll_layout.count()):
+            item = self.scroll_layout.itemAt(i)
+            if item and item.widget():
+                widget = item.widget()
+                if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                    self.scroll_layout.removeWidget(widget)
+                    widget.deleteLater()
+                    break
+
+        # 2. Sağ stack'teki ekranı bul ve kaldır
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                self.chat_screens_stack.removeWidget(widget)
+                widget.deleteLater()
+                break
+
+        # 3. Hoş geldin ekranına dön
+        self.chat_screens_stack.setCurrentIndex(0)
+
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
