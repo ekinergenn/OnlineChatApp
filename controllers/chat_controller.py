@@ -50,7 +50,7 @@ class CreateGroupDialog(QDialog):
         return group_name, selected_users
 
 
-class ChatController:
+class ChatController():
     def __init__(self, main_page, chat_service):
         self.main_page = main_page
         self.chat_service = chat_service
@@ -60,6 +60,28 @@ class ChatController:
 
         # Servisten gelecek cevabı bekle
         self.chat_service.create_group_response_signal.connect(self.on_group_created)
+
+        self.main_page.delete_chat_signal.connect(self.handle_delete_chat)
+        self.main_page.block_user_signal.connect(self.handle_block_user)
+
+        from PyQt5.QtCore import Qt  # En üste import etmeyi unutma
+        self.chat_service.delete_chat_response_signal.connect(self.on_chat_deleted, Qt.QueuedConnection)
+
+    def handle_delete_chat(self, chat_name):
+        # Kullanıcı arayüzde 'Evet'e bastığında bu çalışır, servise iletir
+        self.chat_service.send_delete_chat_request(chat_name, user_id=1)
+
+    def handle_block_user(self, username):
+        QMessageBox.information(self.main_page, "Bilgi", f"'{username}' kişisini engelleme özelliği yakında eklenecek.")
+
+    def on_chat_deleted(self, payload):
+        # Sunucudan başarı cevabı geldiğinde ekrana uyarı ver
+        if payload.get("status") == "success":
+            chat_name = payload.get("chat_name")
+            QMessageBox.information(self.main_page, "Başarılı", f"'{chat_name}' sohbeti silindi!")
+            self.main_page.remove_chat_from_ui(chat_name)
+        else:
+            QMessageBox.warning(self.main_page, "Hata", "Sohbet silinemedi.")
 
     def show_create_group_dialog(self):
         # Kendi tasarladığımız dialog penceresini aç

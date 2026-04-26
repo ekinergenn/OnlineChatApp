@@ -20,6 +20,9 @@ class ClickableFrame(QFrame):
 
 
 class MainPageUI(QWidget):
+    delete_chat_signal = pyqtSignal(str)
+    block_user_signal = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
         self.init_ui()
@@ -350,7 +353,7 @@ class MainPageUI(QWidget):
                 """)
 
         block_action = QAction("🚫 Kişiyi Engelle", chat_frame)
-        # İleride bunu Controller'a bağlayıp servise (block_service) göndereceğiz
+        block_action.triggered.connect(lambda: self.block_user_signal.emit(contact_name))
         menu.addAction(block_action)
 
         options_btn.setMenu(menu)  # Menüyü 3 nokta butonuna bağla
@@ -397,8 +400,8 @@ class MainPageUI(QWidget):
         )
 
         if reply == QMessageBox.Yes:
-            # Şimdilik sadece terminale yazdırıyoruz, ileride Controller'dan sunucuya sildireceğiz
             print(f"[{chat_name}] sohbeti silindi!")
+            self.delete_chat_signal.emit(chat_name)
 
     def add_new_chat_to_ui(self, chat_name):
         """Sunucudan başarılı yanıt gelince yeni grubu sol listeye ve sağ ekrana ekler."""

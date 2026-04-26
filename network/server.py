@@ -102,6 +102,18 @@ class ChatServer:
             }
             self.send_packet(conn, response)
 
+        elif msg_type == "delete_chat_request":
+            payload = packet.get("payload", {})
+            chat_name = payload.get("chat_name")
+            print(f"[SİLME İSTEĞİ] Silinmek istenen sohbet: '{chat_name}'")
+
+            # Başarılı sildik diye cevap dönüyoruz
+            response = {
+                "type": "delete_chat_response",
+                "payload": {"status": "success", "chat_name": chat_name}
+            }
+            self.send_packet(conn, response)
+
     def send_packet(self, conn, packet_dict):
         """Senin Protocol.py yapına uygun şekilde gönderim yapar."""
         json_data = json.dumps(packet_dict) + "<END>"
