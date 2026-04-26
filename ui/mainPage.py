@@ -22,8 +22,8 @@ class ClickableFrame(QFrame):
 class MainPageUI(QWidget):
     delete_chat_signal = pyqtSignal(str)
     block_user_signal = pyqtSignal(str)
-
     send_message_signal = pyqtSignal(str, str)
+    load_history_signal = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -197,6 +197,7 @@ class MainPageUI(QWidget):
         # Tıklanabilir ClickableFrame kullanıyoruz
         item_frame = ClickableFrame()
         item_frame.contact_name = name
+        item_frame.clicked.connect(lambda: self.load_history_signal.emit(name))
         item_frame.setFixedHeight(75)
         item_frame.setCursor(QCursor(Qt.PointingHandCursor))
         item_frame.setStyleSheet("""

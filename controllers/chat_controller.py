@@ -55,9 +55,11 @@ class ChatController():
     def __init__(self, main_page, chat_service):
         self.main_page = main_page
         self.chat_service = chat_service
+        self.loaded_chats = set()
 
         self.main_page.send_message_signal.connect(self.handle_send_message)
         self.chat_service.receive_message_signal.connect(self.on_message_received)
+        self.main_page.load_history_signal.connect(self.load_history_for_chat)
 
         # Artı butonuna tıklanma olayını bağla
         self.main_page.add_chat_btn.clicked.connect(self.show_create_group_dialog)
@@ -122,3 +124,18 @@ class ChatController():
         is_mine = (sender_id == 1)  # ileride login'den gelen ID ile karşılaştırılacak
 
         self.main_page.add_message_to_ui(chat_name, content, is_mine)
+
+    def load_history_for_chat(self, chat_name: str):
+        if chat_name in self.loaded_chats:
+            return  # zaten yüklendi, tekrar yükleme
+
+        messages = self.chat_service.load_chat_history(chat_name)
+        for msg in messages:
+            is_mine = (msg.get("sender_id") == 1)
+            self.main_page.add_message_to_ui(
+                msg.get("chat_name"),
+                msg.get("content"),
+                is_mine
+            )
+
+        self.loaded_chats.add(chat_name)

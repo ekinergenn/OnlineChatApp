@@ -58,3 +58,8 @@ class ChatService(QObject):
     def handle_delete_chat_response(self, payload: dict):
         """Sunucudan gelen silme yanıtını UI'a iletir."""
         self.delete_chat_response_signal.emit(payload)
+
+    def load_chat_history(self, chat_name: str) -> list:
+        """messages.json'dan sohbet geçmişini çeker."""
+        from database.message_repository import get_messages
+        return get_messages(chat_name)
