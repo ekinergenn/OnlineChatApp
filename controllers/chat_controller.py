@@ -85,10 +85,11 @@ class ChatController():
     def handle_block_user(self, username):
         QMessageBox.information(self.main_page, "Bilgi", f"'{username}' kişisini engelleme özelliği yakında eklenecek.")
 
+    # chat_controller.py — on_chat_deleted içine ekle
     def on_chat_deleted(self, payload):
-        # Sunucudan başarı cevabı geldiğinde ekrana uyarı ver
         if payload.get("status") == "success":
             chat_name = payload.get("chat_name")
+            self.loaded_chats.discard(chat_name)  # ← bunu ekle
             QMessageBox.information(self.main_page, "Başarılı", f"'{chat_name}' sohbeti silindi!")
             self.main_page.remove_chat_from_ui(chat_name)
         else:
@@ -139,8 +140,11 @@ class ChatController():
 
         messages = self.chat_service.load_chat_history(chat_name)
         for msg in messages:
-            # sender_id yerine sender (username) ile karşılaştır
-            is_mine = (msg.get("sender") == self.current_username)
+            # Hem sender hem sender_id ile kontrol et (eski mesajlar için fallback)
+            is_mine = (
+                    msg.get("sender") == self.current_username or
+                    (msg.get("sender") is None and msg.get("sender_id") == self.current_user_id)
+            )
             status = msg.get("status", "delivered")
             self.main_page.add_message_to_ui(
                 msg.get("chat_name"),

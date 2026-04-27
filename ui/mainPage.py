@@ -202,8 +202,7 @@ class MainPageUI(QWidget):
             QFrame:hover { background-color: #f5f6f6; }
         """)
 
-        # Tıklama sinyalini StackWidget'ın indeksini değiştirmeye bağlıyoruz
-        item_frame.clicked.connect(lambda: self.chat_screens_stack.setCurrentIndex(stack_index))
+        item_frame.clicked.connect(lambda n=name: self.switch_to_chat(n))
 
         layout = QHBoxLayout(item_frame)
         layout.setContentsMargins(15, 10, 15, 10)
@@ -634,6 +633,14 @@ class MainPageUI(QWidget):
                                     self.scroll_layout.insertWidget(0, widget)
                                 break
                     break
+
+    def switch_to_chat(self, chat_name):
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                self.chat_screens_stack.setCurrentIndex(i)
+                self.load_history_signal.emit(chat_name)
+                break
 
 
 

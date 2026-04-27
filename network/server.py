@@ -7,6 +7,9 @@ from database.message_repository import save_message, get_messages
 from database.user_repository import find_user
 from database.chat_repository import create_chat, get_user_chats
 from database.user_repository import find_user, create_user, search_users
+# server.py'ın EN ÜSTÜNE bu importları ekle (fonksiyon içinde değil!)
+from database.message_repository import save_message, get_messages, delete_chat_messages
+from database.chat_repository import create_chat, get_user_chats, delete_chat
 
 
 class ChatServer:
@@ -147,9 +150,12 @@ class ChatServer:
         elif msg_type == "delete_chat_request":
             payload = packet.get("payload", {})
             chat_name = payload.get("chat_name")
-            print(f"[SİLME İSTEĞİ] Silinmek istenen sohbet: '{chat_name}'")
+            print(f"[SİLME] '{chat_name}' siliniyor...")
 
-            # Başarılı sildik diye cevap dönüyoruz
+            delete_chat_messages(chat_name)  # messages.json'dan sil
+            delete_chat(chat_name)  # chats.json'dan sil
+
+            print(f"[SİLME] '{chat_name}' silindi.")
             response = {
                 "type": "delete_chat_response",
                 "payload": {"status": "success", "chat_name": chat_name}

@@ -37,3 +37,11 @@ def add_member(chat_name: str, username: str) -> bool:
         chats[chat_name]["members"].append(username)
         write_json(FILENAME, chats)
     return True
+
+def delete_chat(chat_name: str) -> bool:
+    chats = get_all_chats()
+    if chat_name not in chats:
+        return False
+    del chats[chat_name]
+    write_json(FILENAME, chats)
+    return True

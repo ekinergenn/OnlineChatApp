@@ -32,3 +32,9 @@ def save_message(chat_name: str, sender: str, content: str, sender_id: int) -> d
     all_messages[chat_name].append(message)
     write_json(FILENAME, all_messages)
     return message
+
+def delete_chat_messages(chat_name: str):
+    all_messages = read_json(FILENAME)
+    if chat_name in all_messages:
+        del all_messages[chat_name]
+        write_json(FILENAME, all_messages)
