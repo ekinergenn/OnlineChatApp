@@ -1,0 +1,122 @@
+{
+  "Mehmet (Ev)": [
+    {
+      "message_id": 1777227563307,
+      "chat_name": "Mehmet (Ev)",
+      "sender": null,
+      "sender_id": 1,
+      "content": "aslm",
+      "timestamp": 1777227563,
+      "status": "delivered",
+      "is_starred": false,
+      "read_by": []
+    },
+    {
+      "message_id": 1777227566529,
+      "chat_name": "Mehmet (Ev)",
+      "sender": null,
+      "sender_id": 1,
+      "content": "merhaba",
+      "timestamp": 1777227566,
+      "status": "delivered",
+      "is_starred": false,
+      "read_by": []
+    },
+    {
+      "message_id": 1777227568171,
+      "chat_name": "Mehmet (Ev)",
+      "sender": null,
+      "sender_id": 1,
+      "content": "naber",
+      "timestamp": 1777227568,
+      "status": "delivered",
+      "is_starred": false,
+      "read_by": []
+    },
+    {
+      "message_id": 1777227580383,
+      "chat_name": "Mehmet (Ev)",
+      "sender": null,
+      "sender_id": 1,
+      "content": "goruyonuz mu",
+      "timestamp": 1777227580,
+      "status": "delivered",
+      "is_starred": false,
+      "read_by": []
+    },
+    {
+      "message_id": 1777240751787,
+      "chat_name": "Mehmet (Ev)",
+      "sender": null,
+      "sender_id": 1,
+      "content": "slm",
+      "timestamp": 1777240751,
+      "status": "delivered",
+      "is_starred": false,
+      "read_by": []
+    },
+    {
+      "message_id": 1777240756425,
+      "chat_name": "Mehmet (Ev)",
+      "sender": null,
+      "sender_id": 1,
+      "content": "slm",
+      "timestamp": 1777240756,
+      "status": "delivered",
+      "is_starred": false,
+      "read_by": []
+    }
+  ],
+  "Ağlar Proje Grubu": [
+    {
+      "message_id": 1777227593994,
+      "chat_name": "Ağlar Proje Grubu",
+      "sender": null,
+      "sender_id": 1,
+      "content": "beni goruyosanşz 1e basin",
+      "timestamp": 1777227593,
+      "status": "delivered",
+      "is_starred": false,
+      "read_by": []
+    }
+  ],
+  "Ahmet Yılmaz": [
+    {
+      "message_id": 1777242056726,
+      "chat_name": "Ahmet Yılmaz",
+      "sender": null,
+      "sender_id": 1,
+      "content": "slm",
+      "timestamp": 1777242056,
+      "status": "delivered",
+      "is_starred": false,
+      "read_by": []
+    }
+  ],
+  "ekinergen": [
+    {
+      "message_id": 1777242599190,
+      "chat_name": "ekinergen",
+      "sender": null,
+      "sender_id": 1,
+      "content": "nbr ekin",
+      "timestamp": 1777242599,
+      "status": "delivered",
+      "is_starred": false,
+      "read_by": []
+    }
+  ],
+  "burakiskar": [
+    {
+      "message_id": 1777275301993,
+      "chat_name": "burakiskar",
+      "sender": null,
+      "sender_id": 1,
+      "content": "nbr slm",
+      "timestamp": 1777275301,
+      "status": "delivered",
+      "is_starred": false,
+      "read_by": []
+    }
+  ]
+}

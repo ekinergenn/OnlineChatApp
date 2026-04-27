@@ -1,0 +1,34 @@
+{
+  "nisanursahin": {
+    "username": "nisanursahin",
+    "password": "nisa",
+    "fullname": "nisanur şahin",
+    "email": "nisanursahin63@gmail.com",
+    "tel": "05317950776",
+    "user_id": 1
+  },
+  "ekinergen": {
+    "username": "ekinergen",
+    "password": "ekin",
+    "fullname": "ekin ergen",
+    "email": "ekin@gmail.com",
+    "tel": "05217950776",
+    "user_id": 2
+  },
+  "burakiskar": {
+    "username": "burakiskar",
+    "password": "burak",
+    "fullname": "burak iskar",
+    "email": "burak@gmail.com",
+    "tel": "05217950775",
+    "user_id": 3
+  },
+  "onursahin": {
+    "username": "onursahin",
+    "password": "onur",
+    "fullname": "onur sahin",
+    "email": "onur@gmail.com",
+    "tel": "05217950774",
+    "user_id": 4
+  }
+}
