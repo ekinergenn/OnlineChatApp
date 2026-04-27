@@ -422,6 +422,7 @@ class MainPageUI(QWidget):
                     scroll.verticalScrollBar().maximum()
                 )
                 break
+        self.update_chat_last_message(chat_name, content, is_mine)
 
     def _create_message_bubble(self, content, is_mine, status="delivered"):
         wrapper = QWidget()
@@ -607,6 +608,32 @@ class MainPageUI(QWidget):
         item_frame.clicked.connect(lambda: self.start_chat_signal.emit(username))
 
         return item_frame
+
+    def update_chat_last_message(self, chat_name, content, is_mine):
+        prefix = "Sen: " if is_mine else ""
+        display_text = f"{prefix}{content}"
+
+        for i in range(self.scroll_layout.count()):
+            item = self.scroll_layout.itemAt(i)
+            if item and item.widget():
+                widget = item.widget()
+                if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                    # msg_label widget'ı bul (layout içinde 2. label)
+                    layout = widget.layout()
+                    for j in range(layout.count()):
+                        inner = layout.itemAt(j)
+                        if inner and inner.layout():
+                            text_layout = inner.layout()
+                            if text_layout.count() >= 2:
+                                msg_label = text_layout.itemAt(1).widget()
+                                if isinstance(msg_label, QLabel):
+                                    msg_label.setText(display_text)
+                                    msg_label.setStyleSheet("font-size: 13px; color: #667781;")
+                                    # Chat'i listenin en üstüne taşı
+                                    self.scroll_layout.removeWidget(widget)
+                                    self.scroll_layout.insertWidget(0, widget)
+                                break
+                    break
 
 
 
