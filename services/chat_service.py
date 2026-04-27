@@ -14,7 +14,7 @@ class ChatService(QObject):
         super().__init__()
         self.client = client
 
-    def send_chat_message(self, chat_name: str, content: str, sender_id: int):
+    def send_chat_message(self, chat_name: str, content: str, sender_id: int, sender: str = ""):
         """Arayüzden gelen metni paketleyip sunucuya gönderir."""
         packet = {
             "type": "chat_message",
@@ -22,6 +22,7 @@ class ChatService(QObject):
                 "chat_name": chat_name,
                 "content": content,
                 "sender_id": sender_id,
+                "sender": sender,
                 "timestamp": int(time.time())
             }
         }

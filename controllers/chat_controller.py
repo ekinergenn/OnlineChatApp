@@ -121,24 +121,26 @@ class ChatController():
     def handle_send_message(self, chat_name, text):
         print(f"[DEBUG] Mesaj gönderiliyor: chat_name={chat_name}, text={text}, sender_id={self.current_user_id}")
         # Kullanıcı ID'sini şimdilik sabit "1" veriyoruz, ileride Login'den gelen ID olacak
-        self.chat_service.send_chat_message(chat_name, text, sender_id=self.current_user_id or 1)
+        self.chat_service.send_chat_message(chat_name, text, sender_id=self.current_user_id or 1, sender=self.current_username or "")
 
     def on_message_received(self, payload: dict):
         chat_name = payload.get("chat_name")
         content = payload.get("content")
-        sender_id = payload.get("sender_id")
+        sender = payload.get("sender")  # ← sender_id yerine sender kullan
         status = payload.get("status", "delivered")
-        is_mine = (sender_id == self.current_user_id)  # ileride login'den gelen ID ile karşılaştırılacak
+        is_mine = (sender == self.current_username)
 
         self.main_page.add_message_to_ui(chat_name, content, is_mine, status)
 
+    # chat_controller.py
     def load_history_for_chat(self, chat_name: str):
         if chat_name in self.loaded_chats:
-            return  # zaten yüklendi, tekrar yükleme
+            return
 
         messages = self.chat_service.load_chat_history(chat_name)
         for msg in messages:
-            is_mine = (msg.get("sender_id") == self.current_user_id)
+            # sender_id yerine sender (username) ile karşılaştır
+            is_mine = (msg.get("sender") == self.current_username)
             status = msg.get("status", "delivered")
             self.main_page.add_message_to_ui(
                 msg.get("chat_name"),
