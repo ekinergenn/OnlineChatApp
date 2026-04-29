@@ -16,6 +16,7 @@ NOT: Tüm paketlerin sonuna ayırıcı olarak <END> eklenmelidir.
     "password": "sifre_ornegi"
   }
 }
+Sunucu Ne Yapar?: `users.json` dosyasını kontrol eder. Şifre eşleşirse oturumu açar.
 
 SUNUCU YANITI (login_response):
 {
@@ -26,7 +27,8 @@ SUNUCU YANITI (login_response):
       "fullname": "Ad Soyad",
       "email": "ornek@mail.com",
       "tel": "05XX XXX XX XX",
-      "user_id": "1"
+      "user_id": 1,
+      "username": "kullanici_adi"
     }
   }
 }
@@ -46,6 +48,7 @@ SUNUCU YANITI (login_response):
     "email": "yeni@mail.com"
   }
 }
+Sunucu Ne Yapar?: Kullanıcı adının sistemde var olup olmadığını kontrol eder. Yoksa `users.json`'a yeni kullanıcıyı kaydeder.
 
 SUNUCU YANITI (register_response):
 {
@@ -57,64 +60,116 @@ SUNUCU YANITI (register_response):
 }
 
 ---------------------------------------------------------------------------
-3. MESAJ GÖNDERME VE İLETME (CHAT MESSAGE)
+3. SOHBETLERİ YÜKLEME (GET USER CHATS)
 ---------------------------------------------------------------------------
 
-İSTEMCİDEN SUNUCUYA (chat_message):
+İSTEMCİ İSTEĞİ (get_user_chats_request):
 {
-  "type": "chat_message",
+  "type": "get_user_chats_request",
   "payload": {
-    "chat_id": "chat_17123456",
-    "sender": "benim_adim",
-    "sender_id":1,
-    "content":"merhaba",
-    "timestamp":24234234.234234,
-    "status":
-    "read_by":["burakiskar","nisa"]
+    "username": "benim_adim"
+  }
+}
+Sunucu Ne Yapar?: `chats.json` dosyasında kullanıcının bulunduğu sohbetleri bulur. Tekli sohbetler için karşı tarafın adını "chat_name" olarak belirler. Ardından ilgili `messages/<chat_id>.json` dosyalarından mesaj geçmişini çeker.
+
+SUNUCU YANITI (get_user_chats_response):
+{
+  "type": "get_user_chats_response",
+  "payload": {
+    "status": "success",
+    "chats": [
+      {
+        "chat_id": "chat_1715882310",
+        "chat_name": "karsi_kisi_adi",
+        "messages": [
+          {
+            "message_id": "123e4567-e89b-12d3-a456-426614174000",
+            "chat_id": "chat_1715882310",
+            "content": "Merhaba!",
+            "sender": "karsi_kisi_adi",
+            "timestamp": 1715882315,
+            "status": "sent",
+            "read_by": ["karsi_kisi_adi"]
+          }
+        ]
+      }
+    ]
   }
 }
 
-SUNUCUDAN ALICIYA (chat_message):
-{
-  "type": "chat_message",
-  "payload": {
-    "chat_id": "chat_17123456",
-    "sender": "benim_adim",
-    "sender_id":1,
-    "content":"merhaba",
-    "timestamp":24234234.234234,
-    "status":
-    "read_by":["burakiskar","nisa"]
-  }
-}
-
 ---------------------------------------------------------------------------
-4. CHAT OLUŞTURMA (CREATE GROUP)
+4. YENİ SOHBET OLUŞTURMA (CREATE CHAT)
 ---------------------------------------------------------------------------
 
 İSTEMCİ İSTEĞİ (create_chat_request):
 {
   "type": "create_chat_request",
   "payload": {
-    "chat_id": "Yazılım Ekibi",
-    "members": ["user1", "user2"],
-    "creator_id": "user1"
-    is_group:False
+    "members": ["benim_adim", "karsi_kisi"]
   }
 }
+Sunucu Ne Yapar?: Benzersiz bir `chat_id` üretir. `chats.json` dosyasına sohbet bilgilerini kaydeder ve `messages/<chat_id>.json` adında boş bir liste ile mesaj dosyasını oluşturur.
 
-SUNUCU YANITI (create_group_response):
+SUNUCU YANITI (create_chat_response):
 {
   "type": "create_chat_response",
   "payload": {
     "status": "success",
     "chat_id": "chat_1715882310",
-    "group_name": "Yazılım Ekibi"
+    "target_username": "karsi_kisi"
   }
 }
 
 ---------------------------------------------------------------------------
-5. KULLANICI ARAMA (SEARCH USERS)
+5. MESAJ GÖNDERME VE İLETME (CHAT MESSAGE)
+---------------------------------------------------------------------------
+
+İSTEMCİDEN SUNUCUYA (chat_message):
+{
+  "type": "chat_message",
+  "payload": {
+    "message_id": "benzersiz_bir_uuid",
+    "chat_id": "chat_17123456",
+    "sender": "benim_adim",
+    "sender_id": 1,
+    "content": "merhaba",
+    "timestamp": 1715882315,
+    "status": "sent",
+    "read_by": ["benim_adim"]
+  }
+}
+Sunucu Ne Yapar?: Güvenlik kontrolü yapar (Gönderici gerçekten sohbette mi?). Mesajı `messages/<chat_id>.json` dosyasına yazar. Eğer sohbetteki diğer üyeler o an çevrimiçiyse, mesajı onlara anında iletir.
+
+SUNUCUDAN ALICIYA (chat_message):
+(Üstteki payload yapısı aynen iletilir)
+
+---------------------------------------------------------------------------
+6. OKUNDU BİLGİSİ GÖNDERME (MARK MESSAGES READ)
+---------------------------------------------------------------------------
+
+İSTEMCİ İSTEĞİ (mark_messages_read):
+{
+  "type": "mark_messages_read",
+  "payload": {
+    "chat_id": "chat_17123456",
+    "message_ids": ["uuid_1", "uuid_2"],
+    "username": "benim_adim"
+  }
+}
+Sunucu Ne Yapar?: Verilen mesaj ID'lerini bulur ve veritabanında (JSON) o mesajların `read_by` listesine isteği gönderen kullanıcının adını ekler. Eğer karşı taraf çevrimiçiyse okundu bilgisini ona yönlendirir.
+
+SUNUCUDAN KARŞI TARAFA (messages_read_receipt):
+{
+  "type": "messages_read_receipt",
+  "payload": {
+    "chat_id": "chat_17123456",
+    "message_ids": ["uuid_1", "uuid_2"],
+    "read_by": "benim_adim"
+  }
+}
+
+---------------------------------------------------------------------------
+7. KULLANICI ARAMA (SEARCH USERS)
 ---------------------------------------------------------------------------
 
 İSTEMCİ İSTEĞİ (search_users_request):
@@ -125,6 +180,7 @@ SUNUCU YANITI (create_group_response):
     "username": "aramayi_yapan_kisi"
   }
 }
+Sunucu Ne Yapar?: Kullanıcı listesinde (users.json) "mehmet" kelimesi ile eşleşenleri bulur. Kendisini listeden çıkarıp kalan sonuçları döndürür.
 
 SUNUCU YANITI (search_users_response):
 {
@@ -135,13 +191,15 @@ SUNUCU YANITI (search_users_response):
       {
         "username": "mehmet123",
         "fullname": "Mehmet Yılmaz",
-        "user_id": "45"
+        "tel": "05XXXXX",
+        "user_id": 45
       }
     ]
   }
 }
+
 ---------------------------------------------------------------------------
-6. SOHBET SİLME (DELETE CHAT)
+8. SOHBET SİLME (DELETE CHAT)
 ---------------------------------------------------------------------------
 
 İSTEMCİ İSTEĞİ (delete_chat_request):
@@ -151,6 +209,7 @@ SUNUCU YANITI (search_users_response):
     "chat_id": "chat_17123456"
   }
 }
+Sunucu Ne Yapar?: `chats.json` dosyasından ilgili sohbeti siler. Mesaj dosyasını (messages/<chat_id>.json) silebilir veya içeriğini temizleyebilir.
 
 SUNUCU YANITI (delete_chat_response):
 {

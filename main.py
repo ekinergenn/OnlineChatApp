@@ -5,9 +5,10 @@ from network import Client
 from ui import LoginPageUI, RegisterPageUI, MainPageUI
 from services import LogRegService
 from services.chat_service import ChatService
+from services.message_service import MessageService
 from controllers import LogRegController
 from controllers.chat_controller import ChatController
-
+from controllers.message_controller import MessageController
 
 class MainApplicationWindow(QMainWindow):
     def __init__(self):
@@ -33,14 +34,14 @@ class MainApplicationWindow(QMainWindow):
 
         # 4. Servisler
         self.chat_service = ChatService(self.chat_client)
+        self.message_service = MessageService(self.chat_client)
         self.logreg_service = LogRegService(self.chat_client, chat_service=self.chat_service)
-
-
 
         # 5. Servisleri client'a tanıt (tek seferde)
         self.chat_client.register_services({
             'logreg_service': self.logreg_service,
-            'chat_service': self.chat_service
+            'chat_service': self.chat_service,
+            'message_service': self.message_service
         })
 
         # 6. Controller'lar
@@ -51,7 +52,8 @@ class MainApplicationWindow(QMainWindow):
             self.logreg_service,
             on_login_success=self.on_login_success
         )
-        self.chat_controller = ChatController(self.main_page, self.chat_service)
+        self.message_controller = MessageController(self.main_page, self.message_service)
+        self.chat_controller = ChatController(self.main_page, self.chat_service, self.message_controller)
 
         # 7. Bağlan ve dinle
         if self.chat_client.connect():
@@ -65,6 +67,7 @@ class MainApplicationWindow(QMainWindow):
         """Login başarılı olunca çağrılır."""
         self.current_user = user_info  # {"user_id": 1, "username": "nisa", ...}
         self.chat_controller.set_current_user(user_info)
+        self.message_controller.set_current_user(user_info)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

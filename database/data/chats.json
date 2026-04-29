@@ -1,22 +1,12 @@
 [
   {
     "chat_name": null,
-    "chat_id": "chat_1777426368",
+    "chat_id": "chat_1777488373",
     "members": [
       "burakiskar",
       "ekinergen"
     ],
     "is_group": false,
-    "created_at": 1777426368.1381066
-  },
-  {
-    "chat_name": null,
-    "chat_id": "chat_1777484342",
-    "members": [
-      "burakiskar",
-      "nisanursahin"
-    ],
-    "is_group": false,
-    "created_at": 1777484342.8931491
+    "created_at": 1777488373.6459615
   }
 ]
