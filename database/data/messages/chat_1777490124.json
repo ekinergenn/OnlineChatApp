@@ -1,0 +1,28 @@
+[
+  {
+    "message_id": "b1457f7a5b114e3ea4f94591e130c950",
+    "chat_id": "chat_1777490124",
+    "content": "naber knkm",
+    "sender_id": 1,
+    "sender": "nisanursahin",
+    "timestamp": 1777490129,
+    "status": "sent",
+    "read_by": [
+      "nisanursahin",
+      "ekinergen"
+    ]
+  },
+  {
+    "message_id": "a15c17eebef94d81bdfddf8eb82f77d7",
+    "chat_id": "chat_1777490124",
+    "content": "merhaba",
+    "sender_id": 1,
+    "sender": "nisanursahin",
+    "timestamp": 1777495048,
+    "status": "sent",
+    "read_by": [
+      "nisanursahin",
+      "ekinergen"
+    ]
+  }
+]

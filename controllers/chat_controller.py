@@ -124,6 +124,7 @@ class ChatController():
         sender = payload.get("sender")
         status = payload.get("status", "delivered")
         message_id = payload.get("message_id")
+        read_by = payload.get("read_by")
 
         is_mine = (sender == self.current_username)
         
@@ -136,7 +137,7 @@ class ChatController():
                 target_widget = widget
                 break
                 
-        self.main_page.add_message_to_ui(chat_name, content, is_mine, status)
+        self.main_page.add_message_to_ui(chat_name, content, is_mine, status, read_by, message_id)
         
         if not is_mine:
             # Check if chat is currently active
@@ -189,7 +190,7 @@ class ChatController():
                 if not is_mine and self.current_username not in message.get("read_by", []):
                     unread_count += 1
                 
-                self.main_page.add_message_to_ui(chat_name, message.get("content"), is_mine, message.get("status", "read"))
+                self.main_page.add_message_to_ui(chat_name, message.get("content"), is_mine, message.get("status", "read"), message.get("read_by", []), message.get("message_id"))
             
             self.main_page.update_chat_unread_count(chat_name, unread_count)
             self.loaded_chats.add(chat_id)
