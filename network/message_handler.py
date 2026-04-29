@@ -22,17 +22,17 @@ class MessageHandler:
         elif msg_type == "delete_chat_response":
             self.services['chat_service'].handle_delete_chat_response(payload)
 
-        elif msg_type == "create_group_response":
-            self.services['chat_service'].handle_server_response(payload)
-
-        elif msg_type == "search_users_response":  # ← ekle
+        elif msg_type == "search_users_response":
             self.services['chat_service'].handle_search_response(payload)
+
+        elif msg_type == "get_user_chats_response":
+            self.services['chat_service'].handle_get_user_chats_response(payload)
+            
+        elif msg_type == "create_chat_response":
+            self.services['chat_service'].handle_create_chat_response(payload)
 
         elif msg_type == "error":
             print("[HATA] Sunucudan hatalı paket geldi.")
-
-        elif msg_type == "create_chat_response":
-            pass  # şimdilik bir şey yapmaya gerek yok
 
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")

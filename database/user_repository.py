@@ -3,21 +3,23 @@ from database.db import read_json, write_json
 FILENAME = "users.json"
 
 
-def get_all_users() -> dict:
+def get_all_users() -> dict | list:
     return read_json(FILENAME)
 
 
 def find_user(username: str) -> dict | None:
     users = get_all_users()
-    return users.get(username)
+    for user in users:
+        if user["username"] == username:
+            return user
 
 
 def create_user(username: str, password: str, fullname: str, email: str, tel:str) -> bool:
     users = get_all_users()
-    if username in users:
-        return False  # Kullanıcı zaten var
-
-    users[username] = {
+    if find_user(username) != None:
+        return False
+    
+    new_user = {
         "username": username,
         "password": password,  # ileride şifrelenecek
         "fullname": fullname,
@@ -25,21 +27,31 @@ def create_user(username: str, password: str, fullname: str, email: str, tel:str
          "tel": tel,
         "user_id": len(users) + 1
     }
+    users.append(new_user)
     write_json(FILENAME, users)
     return True
 
-
 def search_users(query: str, exclude_username: str = None) -> list:
-    users = get_all_users()
+    """
+    Kullanıcıları kullanıcı adı, telefon veya isim üzerinden arar.
+    Aramayı yapan kullanıcıyı (exclude_username) sonuçlardan hariç tutar.
+    """
+    users = get_all_users() # Bu fonksiyon liste döndürür
     results = []
     query = query.lower().strip()
 
-    for username, user in users.items():
+    # Liste üzerinde doğrudan döngü kurmalısın (items() kullanmadan)
+    for user in users:
+        username = user.get("username", "")
+        
+        # Aramayı yapan kullanıcıyı sonuçlarda gösterme
         if exclude_username and username == exclude_username:
             continue
+            
+        # Arama kriterlerini kontrol et (Küçük harfe çevirerek karşılaştır)
         if (query in username.lower() or
-                query in user.get("tel", "").lower() or
-                query in user.get("fullname", "").lower()):
+            query in user.get("tel", "").lower() or
+            query in user.get("fullname", "").lower()):
             results.append(user)
 
     return results

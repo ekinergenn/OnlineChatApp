@@ -66,7 +66,7 @@ class LogRegController:
             self.stacked_widget.setCurrentIndex(2)
             # ← ekle
             if self.on_login_success:
-                self.on_login_success(server_payload)
+                self.on_login_success(server_payload.get("profile"))
         else:
             hata_mesaji = server_payload.get("message", "Bilinmeyen bir hata oluştu.")
             QMessageBox.warning(self.login_page, "Giriş Başarısız", hata_mesaji)

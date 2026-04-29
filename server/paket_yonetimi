@@ -1,0 +1,162 @@
+===========================================================================
+                CHAT SİSTEMİ JSON HABERLEŞME PROTOKOLÜ
+===========================================================================
+NOT: Tüm paketlerin sonuna ayırıcı olarak <END> eklenmelidir.
+Örn: {"type": "..." , "payload": {...}}<END>
+
+---------------------------------------------------------------------------
+1. KULLANICI GİRİŞ İŞLEMİ (LOGIN)
+---------------------------------------------------------------------------
+
+İSTEMCİ İSTEĞİ (login_request):
+{
+  "type": "login_request",
+  "payload": {
+    "name": "kullanici_adi",
+    "password": "sifre_ornegi"
+  }
+}
+
+SUNUCU YANITI (login_response):
+{
+  "type": "login_response",
+  "payload": {
+    "status": "success",
+    "profile": {
+      "fullname": "Ad Soyad",
+      "email": "ornek@mail.com",
+      "tel": "05XX XXX XX XX",
+      "user_id": "1"
+    }
+  }
+}
+
+---------------------------------------------------------------------------
+2. YENİ KAYIT İŞLEMİ (REGISTER)
+---------------------------------------------------------------------------
+
+İSTEMCİ İSTEĞİ (register_request):
+{
+  "type": "register_request",
+  "payload": {
+    "username": "yeni_kullanici",
+    "password": "sifre123",
+    "fullname": "Yeni Kullanici",
+    "tel": "05XXXXXXXXX",
+    "email": "yeni@mail.com"
+  }
+}
+
+SUNUCU YANITI (register_response):
+{
+  "type": "register_response",
+  "payload": {
+    "status": "success",
+    "message": "Kayıt başarılı!"
+  }
+}
+
+---------------------------------------------------------------------------
+3. MESAJ GÖNDERME VE İLETME (CHAT MESSAGE)
+---------------------------------------------------------------------------
+
+İSTEMCİDEN SUNUCUYA (chat_message):
+{
+  "type": "chat_message",
+  "payload": {
+    "chat_id": "chat_17123456",
+    "sender": "benim_adim",
+    "sender_id":1,
+    "content":"merhaba",
+    "timestamp":24234234.234234,
+    "status":
+    "read_by":["burakiskar","nisa"]
+  }
+}
+
+SUNUCUDAN ALICIYA (chat_message):
+{
+  "type": "chat_message",
+  "payload": {
+    "chat_id": "chat_17123456",
+    "sender": "benim_adim",
+    "sender_id":1,
+    "content":"merhaba",
+    "timestamp":24234234.234234,
+    "status":
+    "read_by":["burakiskar","nisa"]
+  }
+}
+
+---------------------------------------------------------------------------
+4. CHAT OLUŞTURMA (CREATE GROUP)
+---------------------------------------------------------------------------
+
+İSTEMCİ İSTEĞİ (create_chat_request):
+{
+  "type": "create_chat_request",
+  "payload": {
+    "chat_id": "Yazılım Ekibi",
+    "members": ["user1", "user2"],
+    "creator_id": "user1"
+    is_group:False
+  }
+}
+
+SUNUCU YANITI (create_group_response):
+{
+  "type": "create_chat_response",
+  "payload": {
+    "status": "success",
+    "chat_id": "chat_1715882310",
+    "group_name": "Yazılım Ekibi"
+  }
+}
+
+---------------------------------------------------------------------------
+5. KULLANICI ARAMA (SEARCH USERS)
+---------------------------------------------------------------------------
+
+İSTEMCİ İSTEĞİ (search_users_request):
+{
+  "type": "search_users_request",
+  "payload": {
+    "query": "mehmet",
+    "username": "aramayi_yapan_kisi"
+  }
+}
+
+SUNUCU YANITI (search_users_response):
+{
+  "type": "search_users_response",
+  "payload": {
+    "status": "success",
+    "results": [
+      {
+        "username": "mehmet123",
+        "fullname": "Mehmet Yılmaz",
+        "user_id": "45"
+      }
+    ]
+  }
+}
+---------------------------------------------------------------------------
+6. SOHBET SİLME (DELETE CHAT)
+---------------------------------------------------------------------------
+
+İSTEMCİ İSTEĞİ (delete_chat_request):
+{
+  "type": "delete_chat_request",
+  "payload": {
+    "chat_id": "chat_17123456"
+  }
+}
+
+SUNUCU YANITI (delete_chat_response):
+{
+  "type": "delete_chat_response",
+  "payload": {
+    "status": "success",
+    "chat_id": "chat_17123456"
+  }
+}

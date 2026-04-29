@@ -1,29 +1,12 @@
-{
-  "ekinergen": {
-    "chat_name": "ekinergen",
+[
+  {
+    "chat_name": null,
+    "chat_id": "chat_1777426368",
     "members": [
-      "nisanursahin",
+      "burakiskar",
       "ekinergen"
     ],
     "is_group": false,
-    "created_at": 1777244259.5720127
-  },
-  "burakiskar": {
-    "chat_name": "burakiskar",
-    "members": [
-      "nisanursahin",
-      "burakiskar"
-    ],
-    "is_group": false,
-    "created_at": 1777275294.117956
-  },
-  "onursahin": {
-    "chat_name": "onursahin",
-    "members": [
-      "nisanursahin",
-      "onursahin"
-    ],
-    "is_group": false,
-    "created_at": 1777301946.738834
+    "created_at": 1777426368.1381066
   }
-}
+]

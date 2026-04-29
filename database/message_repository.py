@@ -1,40 +1,30 @@
 from database.db import read_json, write_json
-import time
+import time,os
 
-FILENAME = "messages.json"
+from database.db import read_json, write_json
+import os
 
-def get_messages(chat_name: str) -> list:
-    all_messages = read_json(FILENAME)
-    if not isinstance(all_messages, dict):
+def get_messages(chat_id: str) -> list:
+    file_path = "messages/" + chat_id + ".json"
+    # Dosya yoksa boş liste döndür, hata alıp okumayı kesme
+    if not os.path.exists(file_path):
         return []
-    return all_messages.get(chat_name, [])
+    return read_json(file_path)
 
-def save_message(chat_name: str, sender: str, content: str, sender_id: int) -> dict:
-    all_messages = read_json(FILENAME)
-    if not isinstance(all_messages, dict):
-        all_messages = {}
+def save_message(payload) -> dict:
+    chat_id = payload.get("chat_id")
+    # 1. Mevcut mesajları ÇEK
+    all_messages = get_messages(chat_id)
+    
+    # 2. Yeni mesajı listeye EKLE
+    all_messages.append(payload)
+    
+    # 3. Tüm listeyi dosyaya YAZ (Üzerine yazma sorunu burada çözülür)[cite: 7]
+    write_json("messages/" + chat_id + ".json", all_messages)
+    return payload
 
-    if chat_name not in all_messages:
-        all_messages[chat_name] = []
-
-    message = {
-        "message_id": int(time.time() * 1000),
-        "chat_name": chat_name,
-        "sender": sender,
-        "sender_id": sender_id,
-        "content": content,
-        "timestamp": int(time.time()),
-        "status": "delivered",  # sent → delivered → read
-        "is_starred": False,
-        "read_by": []
-    }
-
-    all_messages[chat_name].append(message)
-    write_json(FILENAME, all_messages)
-    return message
-
-def delete_chat_messages(chat_name: str):
-    all_messages = read_json(FILENAME)
-    if chat_name in all_messages:
-        del all_messages[chat_name]
-        write_json(FILENAME, all_messages)
+# def delete_chat_messages(chat_name: str):
+#     all_messages = read_json(FILENAME)
+#     if chat_name in all_messages:
+#         del all_messages[chat_name]
+#         write_json(FILENAME, all_messages)

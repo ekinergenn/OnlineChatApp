@@ -1,47 +1,67 @@
 from database.db import read_json, write_json
 
+import time
+
 FILENAME = "chats.json"
 
-def get_all_chats() -> dict:
+def get_all_chats() -> dict | list:
+    """Tüm sohbetleri bir sözlük olarak döndürür."""
     return read_json(FILENAME)
 
 def get_user_chats(username: str) -> list:
-    """Kullanıcının dahil olduğu sohbetleri döndürür."""
+    """Kullanıcının dahil olduğu sohbetleri liste olarak döndürür."""
     chats = get_all_chats()
     user_chats = []
-    for chat_name, chat_data in chats.items():
-        if username in chat_data.get("members", []):
-            user_chats.append(chat_data)
+
+    for chat in chats:
+        for us in chat["members"]:
+            if us == username:
+                user_chats.append(chat["chat_id"])
     return user_chats
 
-def create_chat(chat_name: str, members: list, is_group: bool = False) -> bool:
-    """Yeni sohbet oluşturur."""
+def get_chat_(chats,chat_id:str) -> None | dict:
+    for chat in chats:
+        if chat["chat_id"] == chat_id:
+            return chat
+
+
+def create_chat(chat_id: str, members: list, is_group: bool = False,chat_name:str = None) -> bool:
+    """Yeni bir sohbet oluşturur. chat_id'yi anahtar olarak kullanır."""
     chats = get_all_chats()
-    if chat_name in chats:
+    
+    if get_chat_(chats,chat_id) != None:
         return False
-    chats[chat_name] = {
-        "chat_name": chat_name,
+    
+    new_chat = {
+        "chat_name":chat_name,
+        "chat_id": chat_id,
         "members": members,
         "is_group": is_group,
-        "created_at": __import__('time').time()
+        "created_at": time.time()
     }
+    chats.append(new_chat)
     write_json(FILENAME, chats)
     return True
 
-def add_member(chat_name: str, username: str) -> bool:
-    """Sohbete yeni üye ekler."""
+def add_member(chat_id: int, username: str) -> bool:
+    """Belirli bir chat_id'ye sahip sohbete yeni üye ekler."""
     chats = get_all_chats()
-    if chat_name not in chats:
+    chat = get_chat_(chats,chat_id)
+    if chat == None:
         return False
-    if username not in chats[chat_name]["members"]:
-        chats[chat_name]["members"].append(username)
-        write_json(FILENAME, chats)
+    
+    chat["members"].append(username)
+    write_json(FILENAME, chats)
     return True
 
-def delete_chat(chat_name: str) -> bool:
+
+def delete_chat(chat_id: int) -> bool:
+    """Sohbeti chat_id kullanarak siler."""
     chats = get_all_chats()
-    if chat_name not in chats:
+    chat = get_chat_(chats,chat_id)
+    if chat == None:
         return False
-    del chats[chat_name]
+    
+    chats.remove(chat)
     write_json(FILENAME, chats)
     return True

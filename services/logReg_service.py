@@ -34,9 +34,11 @@ class LogRegService(QObject):
 
     def handle_server_response(self, payload: dict):
         self.login_response_signal.emit(payload)
-        if payload.get("status") == "success" and self.chat_service:
-            chats = payload.get("chats", [])
-            self.chat_service.user_chats_loaded_signal.emit(chats)
+        # if payload.get("status") == "success" and self.chat_service:
+        #     self.chat_service.user_chats_loaded_signal.emit(payload)
+        #     print(payload)
+
 
     def handle_register_response(self, payload: dict):
+        print(payload)
         self.register_response_signal.emit(payload)
