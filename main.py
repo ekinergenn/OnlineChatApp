@@ -2,6 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget
 import threading
 from network import Client
+from services.block_service import BlockService
 from ui import LoginPageUI, RegisterPageUI, MainPageUI
 from services import LogRegService
 from services.chat_service import ChatService
@@ -34,13 +35,14 @@ class MainApplicationWindow(QMainWindow):
         # 4. Servisler
         self.chat_service = ChatService(self.chat_client)
         self.logreg_service = LogRegService(self.chat_client, chat_service=self.chat_service)
-
+        self.block_service = BlockService(self.chat_client)
 
 
         # 5. Servisleri client'a tanıt (tek seferde)
         self.chat_client.register_services({
             'logreg_service': self.logreg_service,
-            'chat_service': self.chat_service
+            'chat_service': self.chat_service,
+            'block_service': self.block_service
         })
 
         # 6. Controller'lar
@@ -51,7 +53,7 @@ class MainApplicationWindow(QMainWindow):
             self.logreg_service,
             on_login_success=self.on_login_success
         )
-        self.chat_controller = ChatController(self.main_page, self.chat_service)
+        self.chat_controller = ChatController(self.main_page, self.chat_service, self.block_service)
 
         # 7. Bağlan ve dinle
         if self.chat_client.connect():

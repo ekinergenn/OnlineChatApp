@@ -1,0 +1,9 @@
+{
+  "blocks": [
+    {
+      "blocker_id": 2,
+      "blocked_id": 3,
+      "isBlocked": false
+    }
+  ]
+}

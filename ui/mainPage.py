@@ -311,7 +311,9 @@ class MainPageUI(QWidget):
         """)
         block_action = QAction("🚫 Kişiyi Engelle", chat_frame)
         block_action.triggered.connect(lambda: self.block_user_signal.emit(contact_name))
+        chat_frame.block_action = block_action
         menu.addAction(block_action)
+
         options_btn.setMenu(menu)
 
         top_layout.addWidget(avatar)
@@ -370,6 +372,32 @@ class MainPageUI(QWidget):
         layout.addWidget(bottom_bar)
 
         return chat_frame
+
+    def handle_block_user(self, contact_name):
+        receiver_id = self.get_receiver_id_from_name(contact_name)
+        if not receiver_id: return
+
+        # mevcut durum
+        status = self.block_repo.check_block_status(self.current_user_id, receiver_id)
+
+        if status == "blocked_by_me":
+            # engel kaldirma
+            self.block_repo.add_or_update_block(self.current_user_id, receiver_id, status=False)
+            if self.block_service:
+                self.block_service.send_unblock_user_request(self.current_user_id, receiver_id)
+            QMessageBox.information(self.main_page, "Başarılı", f"{contact_name} engeli kaldırıldı.")
+        else:
+            # engelleme
+            reply = QMessageBox.question(self.main_page, 'Kişiyi Engelle', f"{contact_name} engellensin mi?",
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.block_repo.add_or_update_block(self.current_user_id, receiver_id, status=True)
+                if self.block_service:
+                    self.block_service.send_block_user_request(self.current_user_id, receiver_id)
+                QMessageBox.information(self.main_page, "Başarılı", f"{contact_name} engellendi.")
+
+        # arayuz tazeleme
+        self.handle_chat_switched(contact_name)
 
     def confirm_delete_chat(self, chat_name):
         """Çöp kutusuna basıldığında sohbeti silme onayı ister."""
