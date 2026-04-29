@@ -1,5 +1,6 @@
 from PyQt5.QtCore import QObject, pyqtSignal
 import time
+import uuid
 
 class ChatService(QObject):
     delete_chat_response_signal = pyqtSignal(dict)
@@ -16,13 +17,27 @@ class ChatService(QObject):
         packet = {
             "type": "chat_message",
             "payload": {
+                "message_id": uuid.uuid4().hex,
                 "chat_id": chat_id,
                 "content": content,
                 "sender_id": sender_id,
                 "sender": sender,
                 "timestamp": int(time.time()),
                 "status": "sent",
-                "read_by": []
+                "read_by": [sender]
+            }
+        }
+        self.client.send_data(packet)
+
+    def send_mark_as_read(self, chat_id: str, message_ids: list, username: str):
+        if not message_ids:
+            return
+        packet = {
+            "type": "mark_messages_read",
+            "payload": {
+                "chat_id": chat_id,
+                "message_ids": message_ids,
+                "username": username
             }
         }
         self.client.send_data(packet)

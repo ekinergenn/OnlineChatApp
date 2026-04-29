@@ -1,0 +1,20 @@
+[
+  {
+    "chat_id": "chat_1777484342",
+    "content": "selam",
+    "sender_id": 3,
+    "sender": "burakiskar",
+    "timestamp": 1777484347,
+    "status": "sent",
+    "read_by": []
+  },
+  {
+    "chat_id": "chat_1777484342",
+    "content": "hello",
+    "sender_id": 3,
+    "sender": "burakiskar",
+    "timestamp": 1777484760,
+    "status": "sent",
+    "read_by": []
+  }
+]

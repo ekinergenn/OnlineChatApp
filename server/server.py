@@ -8,7 +8,7 @@ from database.user_repository import *
 from database.chat_repository import *
 from database.user_repository import find_user, create_user
 # server.py'ın EN ÜSTÜNE bu importları ekle (fonksiyon içinde değil!)
-from database.message_repository import save_message, get_messages
+from database.message_repository import save_message, get_messages, mark_messages_as_read
 from database.chat_repository import create_chat, get_user_chats, delete_chat
 
 
@@ -141,17 +141,56 @@ class ChatServer:
                         }
                         self.send_packet(member_socket, response_packet)
 
+        elif msg_type == "mark_messages_read":
+            payload = packet.get("payload", {})
+            chat_id = payload.get("chat_id")
+            message_ids = payload.get("message_ids", [])
+            username = payload.get("username")
+
+            if chat_id and message_ids and username:
+                mark_messages_as_read(chat_id, message_ids, username)
+                
+                # İsteğe bağlı olarak diğer üyelere ilet (Okundu bilgisinin canlı güncellenmesi için)
+                all_chats = get_all_chats()
+                active_chat = get_chat_(all_chats, chat_id)
+                if active_chat:
+                    for member in active_chat["members"]:
+                        if member != username and member in self.online_users:
+                            member_socket = self.online_users[member]
+                            response_packet = {
+                                "type": "messages_read_receipt",
+                                "payload": {
+                                    "chat_id": chat_id,
+                                    "message_ids": message_ids,
+                                    "read_by": username
+                                }
+                            }
+                            self.send_packet(member_socket, response_packet)
+
         elif msg_type == "get_user_chats_request":
             payload = packet.get("payload", {})
             username = payload.get("username")
 
             user_chats = get_user_chats(username)
+            all_chats = get_all_chats()
             packet_data = []
             
             for chat_id in user_chats:
                 chat_messages = get_messages(chat_id)
+                chat_obj = get_chat_(all_chats, chat_id)
+                display_name = chat_id
+                
+                if chat_obj:
+                    if chat_obj.get("chat_name"):
+                        display_name = chat_obj.get("chat_name")
+                    elif len(chat_obj.get("members", [])) == 2:
+                        other_members = [m for m in chat_obj.get("members", []) if m != username]
+                        if other_members:
+                            display_name = other_members[0]
+
                 packet_data.append({
                     "chat_id": chat_id,
+                    "chat_name": display_name,
                     "messages": chat_messages
                 })
 
@@ -224,32 +263,32 @@ class ChatServer:
             }
             self.send_packet(conn, response)
 
-        elif msg_type == "create_chat_request":
-            payload = packet.get("payload", {})
-            members = payload.get("members", []) # [gönderen, alıcı]
+        # elif msg_type == "create_chat_request":
+        #     payload = packet.get("payload", {})
+        #     members = payload.get("members", []) # [gönderen, alıcı]
             
-            # 1. Benzersiz bir Chat ID üret (Örn: chat_17123456)
-            import time
-            new_chat_id = f"chat_{int(time.time())}"
+        #     # 1. Benzersiz bir Chat ID üret (Örn: chat_17123456)
+        #     import time
+        #     new_chat_id = f"chat_{int(time.time())}"
 
-            try:
-                # 2. Veritabanına (chats.json) kaydet[cite: 6]
-                # is_group=False çünkü bu bir birebir sohbet
-                create_chat(new_chat_id, members, is_group=False)
+        #     try:
+        #         # 2. Veritabanına (chats.json) kaydet[cite: 6]
+        #         # is_group=False çünkü bu bir birebir sohbet
+        #         create_chat(new_chat_id, members, is_group=False)
                 
-                # 3. İsteği gönderen kişiye yanıt dön
-                response = {
-                    "type": "create_chat_response",
-                    "payload": {
-                        "status": "success",
-                        "chat_id": new_chat_id,
-                        "target_username": members[1] # Kiminle sohbet açıldıysa o
-                    }
-                }
-                self.send_packet(conn, response)
-                print(f"[SOHBET] '{new_chat_id}' oluşturuldu, üyeler: {members}")
-            except Exception as e:
-                print(f"[SOHBET HATA] {e}")
+        #         # 3. İsteği gönderen kişiye yanıt dön
+        #         response = {
+        #             "type": "create_chat_response",
+        #             "payload": {
+        #                 "status": "success",
+        #                 "chat_id": new_chat_id,
+        #                 "target_username": members[1] # Kiminle sohbet açıldıysa o
+        #             }
+        #         }
+        #         self.send_packet(conn, response)
+        #         print(f"[SOHBET] '{new_chat_id}' oluşturuldu, üyeler: {members}")
+        #     except Exception as e:
+        #         print(f"[SOHBET HATA] {e}")
 
     def send_packet(self, conn, packet_dict):
         """Senin Protocol.py yapına uygun şekilde gönderim yapar."""

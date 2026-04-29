@@ -6,9 +6,6 @@ import os
 
 def get_messages(chat_id: str) -> list:
     file_path = "messages/" + chat_id + ".json"
-    # Dosya yoksa boş liste döndür, hata alıp okumayı kesme
-    if not os.path.exists(file_path):
-        return []
     return read_json(file_path)
 
 def save_message(payload) -> dict:
@@ -28,3 +25,17 @@ def save_message(payload) -> dict:
 #     if chat_name in all_messages:
 #         del all_messages[chat_name]
 #         write_json(FILENAME, all_messages)
+
+def mark_messages_as_read(chat_id: str, message_ids: list, username: str) -> None:
+    all_messages = get_messages(chat_id)
+    updated = False
+    for msg in all_messages:
+        if msg.get("message_id") in message_ids:
+            read_by = msg.get("read_by", [])
+            if username not in read_by:
+                read_by.append(username)
+                msg["read_by"] = read_by
+                updated = True
+    
+    if updated:
+        write_json("messages/" + chat_id + ".json", all_messages)

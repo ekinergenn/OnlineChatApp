@@ -4,8 +4,47 @@
     "content": "selam",
     "sender_id": 3,
     "sender": "burakiskar",
-    "timestamp": 1777426739,
+    "timestamp": 1777484325,
     "status": "sent",
     "read_by": []
+  },
+  {
+    "message_id": "0b773ad6dea547e2b258a46f1f88da8f",
+    "chat_id": "chat_1777426368",
+    "content": "selam",
+    "sender_id": 2,
+    "sender": "ekinergen",
+    "timestamp": 1777486791,
+    "status": "sent",
+    "read_by": [
+      "ekinergen",
+      "burakiskar"
+    ]
+  },
+  {
+    "message_id": "c8b1b32fb168421f83aaacbc662d9ef8",
+    "chat_id": "chat_1777426368",
+    "content": "proje yetişcek mi",
+    "sender_id": 2,
+    "sender": "ekinergen",
+    "timestamp": 1777486806,
+    "status": "sent",
+    "read_by": [
+      "ekinergen",
+      "burakiskar"
+    ]
+  },
+  {
+    "message_id": "db6f2738e16548c39de49882e63479f8",
+    "chat_id": "chat_1777426368",
+    "content": "bilmiyorum",
+    "sender_id": 3,
+    "sender": "burakiskar",
+    "timestamp": 1777486813,
+    "status": "sent",
+    "read_by": [
+      "burakiskar",
+      "ekinergen"
+    ]
   }
 ]

@@ -190,10 +190,11 @@ class MainPageUI(QWidget):
 
         self.chats_page_layout.addWidget(chat_list_frame)
 
-    def create_chat_item(self, name, last_message, time, is_unread, stack_index):
+    def create_chat_item(self, name, last_message, time, unread_count, stack_index):
         # Tıklanabilir ClickableFrame kullanıyoruz
         item_frame = ClickableFrame()
         item_frame.contact_name = name
+        item_frame.unread_count = unread_count
         item_frame.clicked.connect(lambda: self.load_history_signal.emit(name))
         item_frame.setFixedHeight(75)
         item_frame.setCursor(QCursor(Qt.PointingHandCursor))
@@ -223,7 +224,7 @@ class MainPageUI(QWidget):
         name_label.setStyleSheet("font-size: 16px; color: #111b21; font-weight: 500;")
 
         msg_label = QLabel(last_message)
-        if is_unread:
+        if unread_count > 0:
             msg_label.setStyleSheet("font-size: 13px; color: #111b21; font-weight: bold;")
         else:
             msg_label.setStyleSheet("font-size: 13px; color: #667781;")
@@ -236,22 +237,28 @@ class MainPageUI(QWidget):
         info_layout.setAlignment(Qt.AlignRight | Qt.AlignTop)
 
         time_label = QLabel(time)
-        if is_unread:
+        if unread_count > 0:
             time_label.setStyleSheet("font-size: 12px; color: #3b82f6; font-weight: bold;")
-            badge = QLabel("1")
+            badge = QLabel(str(unread_count))
             badge.setFixedSize(20, 20)
             badge.setAlignment(Qt.AlignCenter)
             badge.setStyleSheet("background-color: #3b82f6; color: white; border-radius: 10px; font-size: 11px; font-weight: bold;")
             info_layout.addWidget(time_label)
             info_layout.addWidget(badge, alignment=Qt.AlignRight)
+            item_frame.badge_label = badge
         else:
             time_label.setStyleSheet("font-size: 12px; color: #667781;")
             info_layout.addWidget(time_label)
+            item_frame.badge_label = None
 
         layout.addWidget(avatar)
         layout.addLayout(text_layout)
         layout.addStretch()
         layout.addLayout(info_layout)
+        
+        item_frame.msg_label = msg_label
+        item_frame.time_label = time_label
+        item_frame.info_layout = info_layout
 
         return item_frame
 
@@ -384,7 +391,7 @@ class MainPageUI(QWidget):
             name=chat_name,
             last_message=last_message,  # ← boş bırak
             time="",
-            is_unread=False,
+            unread_count=0,
             stack_index=new_stack_index
         )
         self.scroll_layout.insertWidget(0, new_chat_item)
@@ -632,6 +639,32 @@ class MainPageUI(QWidget):
                                     self.scroll_layout.removeWidget(widget)
                                     self.scroll_layout.insertWidget(0, widget)
                                 break
+                    break
+
+    def update_chat_unread_count(self, chat_name, count):
+        for i in range(self.scroll_layout.count()):
+            item = self.scroll_layout.itemAt(i)
+            if item and item.widget():
+                widget = item.widget()
+                if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                    widget.unread_count = count
+                    if widget.badge_label:
+                        widget.info_layout.removeWidget(widget.badge_label)
+                        widget.badge_label.deleteLater()
+                        widget.badge_label = None
+
+                    if count > 0:
+                        widget.msg_label.setStyleSheet("font-size: 13px; color: #111b21; font-weight: bold;")
+                        widget.time_label.setStyleSheet("font-size: 12px; color: #3b82f6; font-weight: bold;")
+                        badge = QLabel(str(count))
+                        badge.setFixedSize(20, 20)
+                        badge.setAlignment(Qt.AlignCenter)
+                        badge.setStyleSheet("background-color: #3b82f6; color: white; border-radius: 10px; font-size: 11px; font-weight: bold;")
+                        widget.info_layout.addWidget(badge, alignment=Qt.AlignRight)
+                        widget.badge_label = badge
+                    else:
+                        widget.msg_label.setStyleSheet("font-size: 13px; color: #667781;")
+                        widget.time_label.setStyleSheet("font-size: 12px; color: #667781;")
                     break
 
     def switch_to_chat(self, chat_name):
