@@ -10,6 +10,12 @@
       "blocked_id": "3",
       "isBlocked": true,
       "timestamp": 1777494529.4293065
+    },
+    {
+      "blocker_id": "3",
+      "blocked_id": "2",
+      "isBlocked": false,
+      "timestamp": 1777496780.3528118
     }
   ]
 }
