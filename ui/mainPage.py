@@ -311,7 +311,9 @@ class MainPageUI(QWidget):
         """)
         block_action = QAction("🚫 Kişiyi Engelle", chat_frame)
         block_action.triggered.connect(lambda: self.block_user_signal.emit(contact_name))
+        chat_frame.block_action = block_action
         menu.addAction(block_action)
+
         options_btn.setMenu(menu)
 
         top_layout.addWidget(avatar)
@@ -338,6 +340,8 @@ class MainPageUI(QWidget):
         # referansları frame'e göm — sonra add_message_to_ui bulacak
         chat_frame.msg_layout = msg_layout
         chat_frame.scroll = scroll
+
+        chat_frame.message_status_labels = {}
 
         # ── ALT BAR ──────────────────────────────────────────
         bottom_bar = QFrame()
@@ -370,6 +374,32 @@ class MainPageUI(QWidget):
         layout.addWidget(bottom_bar)
 
         return chat_frame
+
+    def handle_block_user(self, contact_name):
+        receiver_id = self.get_receiver_id_from_name(contact_name)
+        if not receiver_id: return
+
+        # mevcut durum
+        status = self.block_repo.check_block_status(self.current_user_id, receiver_id)
+
+        if status == "blocked_by_me":
+            # engel kaldirma
+            self.block_repo.add_or_update_block(self.current_user_id, receiver_id, status=False)
+            if self.block_service:
+                self.block_service.send_unblock_user_request(self.current_user_id, receiver_id)
+            QMessageBox.information(self.main_page, "Başarılı", f"{contact_name} engeli kaldırıldı.")
+        else:
+            # engelleme
+            reply = QMessageBox.question(self.main_page, 'Kişiyi Engelle', f"{contact_name} engellensin mi?",
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.block_repo.add_or_update_block(self.current_user_id, receiver_id, status=True)
+                if self.block_service:
+                    self.block_service.send_block_user_request(self.current_user_id, receiver_id)
+                QMessageBox.information(self.main_page, "Başarılı", f"{contact_name} engellendi.")
+
+        # arayuz tazeleme
+        self.handle_chat_switched(contact_name)
 
     def confirm_delete_chat(self, chat_name):
         """Çöp kutusuna basıldığında sohbeti silme onayı ister."""
@@ -405,39 +435,45 @@ class MainPageUI(QWidget):
             self.send_message_signal.emit(chat_name, text)
             input_field.clear()  # Gönderdikten sonra kutuyu temizle
 
-    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered"):
+    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None):
+        if read_by is None:
+            read_by = []
+
         for i in range(self.chat_screens_stack.count()):
             widget = self.chat_screens_stack.widget(i)
             if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
                 msg_layout = widget.msg_layout
                 scroll = widget.scroll
 
-                # Son stretch'i geçici kaldır
                 stretch_item = msg_layout.takeAt(msg_layout.count() - 1)
 
-                # Baloncuğu ekle
-                bubble = self._create_message_bubble(content, is_mine, status)
+                bubble, status_label = self._create_message_bubble(content, is_mine, status, read_by)
                 msg_layout.addWidget(bubble)
 
-                # Stretch'i geri koy
                 msg_layout.addStretch()
 
-                # En alta kaydır
+                if is_mine and message_id and status_label:
+                    widget.message_status_labels[message_id] = status_label
+
                 QApplication.processEvents()
                 scroll.verticalScrollBar().setValue(
                     scroll.verticalScrollBar().maximum()
                 )
                 break
+
         self.update_chat_last_message(chat_name, content, is_mine)
 
-    def _create_message_bubble(self, content, is_mine, status="delivered"):
+    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None):
+        # ── YENİ: read_by parametresi eklendi (eskiden yoktu)
+        if read_by is None:
+            read_by = []
+
         wrapper = QWidget()
         wrapper.setStyleSheet("background: transparent;")
         w_layout = QHBoxLayout(wrapper)
         w_layout.setContentsMargins(0, 0, 0, 0)
         w_layout.setSpacing(0)
 
-        # Balon + durum ikonu için dikey container
         bubble_container = QWidget()
         bubble_container.setStyleSheet("background: transparent;")
         b_layout = QVBoxLayout(bubble_container)
@@ -449,24 +485,42 @@ class MainPageUI(QWidget):
         bubble.setMaximumWidth(400)
         bubble.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
+        # ── YENİ: status_label değişkeni tanımlandı (None olarak başlıyor)
+        # eskiden yoktu, direkt status_label = QLabel() yapılıyordu
+        status_label = None
+
         if is_mine:
             bubble.setStyleSheet("""
                 background-color: #dcf8c6; color: #111b21;
                 border-radius: 8px; padding: 8px 12px; font-size: 14px;
             """)
 
-            # Durum ikonu (sadece kendi mesajlarımızda)
-            status_label = QLabel()
-            if status == "sent":
-                status_label.setText("✓")
-                status_label.setStyleSheet("color: #667781; font-size: 11px;")
-            elif status == "delivered":
-                status_label.setText("✓✓")
-                status_label.setStyleSheet("color: #667781; font-size: 11px;")
-            elif status == "read":
-                status_label.setText("✓✓")
-                status_label.setStyleSheet("color: #3b82f6; font-size: 11px; font-weight: bold;")
+            # ── YENİ: Tik kararı artık read_by'a bakıyor
+            # eskiden sadece status string'ine bakılıyordu (sent/delivered/read)
+            others_read = [u for u in read_by if u]
 
+            if len(others_read) >= 2:
+                # Gönderen + en az 1 alıcı okumuş → mavi çift tik
+                tick_text = "✓✓"
+                tick_style = "color: #3b82f6; font-size: 11px; font-weight: bold;"
+            elif len(others_read) == 1:
+                # Sadece gönderen var → gri çift tik (iletildi)
+                tick_text = "✓✓"
+                tick_style = "color: #667781; font-size: 11px;"
+            else:
+                # read_by boş → eski status mantığına düş
+                if status == "sent":
+                    tick_text = "✓"
+                    tick_style = "color: #667781; font-size: 11px;"
+                elif status == "read":
+                    tick_text = "✓✓"
+                    tick_style = "color: #3b82f6; font-size: 11px; font-weight: bold;"
+                else:  # delivered
+                    tick_text = "✓✓"
+                    tick_style = "color: #667781; font-size: 11px;"
+
+            status_label = QLabel(tick_text)
+            status_label.setStyleSheet(tick_style)
             status_label.setAlignment(Qt.AlignRight)
 
             b_layout.addWidget(bubble)
@@ -484,7 +538,8 @@ class MainPageUI(QWidget):
             w_layout.addWidget(bubble_container)
             w_layout.addStretch()
 
-        return wrapper
+        # ── YENİ: Tuple olarak dönüyor (eskiden sadece wrapper dönüyordu)
+        return wrapper, status_label
 
     def create_chat_screens_stack(self):
         self.chat_screens_stack = QStackedWidget()
@@ -673,6 +728,19 @@ class MainPageUI(QWidget):
             if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
                 self.chat_screens_stack.setCurrentIndex(i)
                 self.load_history_signal.emit(chat_name)
+                break
+
+    def update_message_read_status(self, chat_name: str, message_ids: list, reader_username: str):
+        # Sunucudan 'messages_read_receipt' geldiğinde çağrılır
+        # İlgili mesajların tikini mavi yapar
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                for msg_id in message_ids:
+                    status_label = widget.message_status_labels.get(msg_id)
+                    if status_label:
+                        status_label.setText("✓✓")
+                        status_label.setStyleSheet("color: #3b82f6; font-size: 11px; font-weight: bold;")
                 break
 
 

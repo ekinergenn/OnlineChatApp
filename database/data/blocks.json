@@ -1,0 +1,15 @@
+{
+  "blocks": [
+    {
+      "blocker_id": 2,
+      "blocked_id": 3,
+      "isBlocked": false
+    },
+    {
+      "blocker_id": "1",
+      "blocked_id": "3",
+      "isBlocked": true,
+      "timestamp": 1777494529.4293065
+    }
+  ]
+}
