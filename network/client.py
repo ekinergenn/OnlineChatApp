@@ -49,6 +49,7 @@ class Client:
                 data = self.receive_data()
                 if not data:
                     break
+                
                 self.message_handler.handle_incoming_data(data)
                 
             except Exception:

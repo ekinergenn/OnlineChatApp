@@ -34,8 +34,16 @@ class MessageHandler:
         elif msg_type == "create_chat_response":
             self.services['chat_service'].handle_create_chat_response(payload)
 
+        elif msg_type == "block_user_response":
+            self.services['block_service'].handle_block_response(payload)
+
+        elif msg_type == "get_block_list_response":
+            self.services['block_service'].handle_block_list_response(payload)
+
         elif msg_type == "error":
-            print("[HATA] Sunucudan hatalı paket geldi.")
+            msg = payload.get("message", "Sunucudan hata alındı.")
+            print(f"[HATA] {msg}")
+            # Opsiyonel: UI'da gösterilmek üzere bir sinyal fırlatılabilir
 
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")

@@ -1,10 +1,8 @@
 from PyQt5.QtWidgets import QMessageBox
-from database import block_repository
 from services.block_service import BlockService
 
 class ChatController():
     def __init__(self, main_page, chat_service, message_controller, block_service = None):
-        self.block_repo = block_repository
         self.block_service = block_service
         self.main_page = main_page
         self.chat_service = chat_service
@@ -22,6 +20,8 @@ class ChatController():
         self.chat_service.user_chats_loaded_signal.connect(self.load_user_chats)
         self.chat_service.search_results_signal.connect(self.main_page.show_search_results)
         self.chat_service.create_chat_response_signal.connect(self.on_chat_created)
+        if self.block_service:
+            self.block_service.block_status_changed_signal.connect(self.on_block_status_received)
 
     def set_current_user(self, profile: dict):
         self.current_user_id = profile.get("user_id")
@@ -29,48 +29,44 @@ class ChatController():
         
         self.chat_service.send_get_user_chats_request(self.current_username)
 
-    def get_receiver_id_from_name(self, username):
-        try:
-            from database import user_repository
-            users = user_repository.get_all_users()
-
-            if not users:
-                print("[DEBUG] users.json boş veya okunamadı!")
-                return None
-
-            for user_data in users:
-                current_username = str(user_data.get("username", "")).strip().lower()
-                target_username = str(username).strip().lower()
-
-                if current_username == target_username:
-                    return user_data.get("user_id")
-
-        except Exception as e:
-            print(f"[ERROR] get_receiver_id_from_name hatası: {e}")
-
-        return None
+    def on_block_status_received(self, payload: dict):
+        # Sunucudan gelen block yanıtını işle
+        blocked_id = payload.get("blocked_id")
+        is_blocked = payload.get("is_blocked")
+        
+        # UI'daki tüm açık sohbetleri tara ve bu kullanıcıya aitse güncelle
+        for i in range(self.main_page.chat_screens_stack.count()):
+            widget = self.main_page.chat_screens_stack.widget(i)
+            if getattr(widget, 'other_user_id', None) == str(blocked_id):
+                self.update_block_ui_elements(getattr(widget, 'contact_name', ""), is_blocked)
+                break
 
     def handle_block_user(self, contact_name):
-        receiver_id = self.get_receiver_id_from_name(contact_name)
-        if not receiver_id: return
+        # Sohbet ekranından other_user_id'yi al
+        target_widget = None
+        for i in range(self.main_page.chat_screens_stack.count()):
+            widget = self.main_page.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == contact_name:
+                target_widget = widget
+                break
+        
+        if not target_widget: return
+        receiver_id = getattr(target_widget, 'other_user_id', None)
+        if not receiver_id:
+            QMessageBox.warning(self.main_page, "Hata", "Kullanıcı bilgisi bulunamadı.")
+            return
 
-        status = self.block_repo.check_block_status(self.current_user_id, receiver_id)
-
-        is_currently_blocked = (status == "blocked_by_me")
-        new_status = not is_currently_blocked
-
-        self.block_repo.add_or_update_block(self.current_user_id, receiver_id, status=new_status)
-
-        if self.block_service:
-            if new_status:
+        is_currently_blocked = (target_widget.block_action.text() == "🔓 Engeli Kaldır")
+        
+        if is_currently_blocked:
+            # Engel kaldır
+            self.block_service.send_unblock_user_request(self.current_user_id, receiver_id)
+        else:
+            # Engelle
+            reply = QMessageBox.question(self.main_page, 'Kişiyi Engelle', f"{contact_name} engellensin mi?",
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
                 self.block_service.send_block_user_request(self.current_user_id, receiver_id)
-            else:
-                self.block_service.send_unblock_user_request(self.current_user_id, receiver_id)
-
-        self.update_block_ui_elements(contact_name, new_status)
-
-        msg = "Engel kaldırıldı." if is_currently_blocked else "Kullanıcı engellendi."
-        QMessageBox.information(self.main_page, "Bilgi", msg)
 
     def update_block_ui_elements(self, contact_name, is_blocked):
         for i in range(self.main_page.chat_screens_stack.count()):
@@ -85,26 +81,26 @@ class ChatController():
         for chat in chats:
             chat_id = chat.get("chat_id")
             chat_name = chat.get("chat_name", chat_id)
+            other_user_id = chat.get("other_user_id")
+            block_status = chat.get("block_status", "none")
             
             # Add chat to UI
             self.main_page.add_new_chat_to_ui(chat_name)
+            
+            # Widget'a ID ve block bilgisini göm
+            for i in range(self.main_page.chat_screens_stack.count()):
+                widget = self.main_page.chat_screens_stack.widget(i)
+                if getattr(widget, 'contact_name', None) == chat_name:
+                    widget.other_user_id = str(other_user_id) if other_user_id else None
+                    if block_status == "blocked_by_me":
+                        widget.block_action.setText("🔓 Engeli Kaldır")
+                    else:
+                        widget.block_action.setText("🚫 Kişiyi Engelle")
+                    break
+
             # Yükleme işlemi message_controller'a devrediliyor
             self.message_controller.load_historical_messages(chat_name, chat_id, chat.get("messages", []))
             self.loaded_chats.add(chat_id)
-
-            receiver_id = self.get_receiver_id_from_name(chat_name)
-            if receiver_id:
-                status = self.block_repo.check_block_status(self.current_user_id, receiver_id)
-                # menu yazısı gunceller
-                for i in range(self.main_page.chat_screens_stack.count()):
-                    widget = self.main_page.chat_screens_stack.widget(i)
-                    if getattr(widget, 'contact_name', None) == chat_name:
-                        if hasattr(widget, 'block_action'):
-                            if status == "blocked_by_me":
-                                widget.block_action.setText("🔓 Engeli Kaldır")
-                            else:
-                                widget.block_action.setText("🚫 Kişiyi Engelle")
-                        break
 
     def handle_search(self, query: str):
         self.chat_service.send_search_request(query, self.current_username or "")

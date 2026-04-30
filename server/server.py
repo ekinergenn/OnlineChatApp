@@ -10,6 +10,7 @@ from database.user_repository import find_user, create_user
 # server.py'ın EN ÜSTÜNE bu importları ekle (fonksiyon içinde değil!)
 from database.message_repository import save_message, get_messages, mark_messages_as_read
 from database.chat_repository import create_chat, get_user_chats, delete_chat
+from database import block_repository
 
 
 class ChatServer:
@@ -122,13 +123,38 @@ class ChatServer:
         elif msg_type == "chat_message":
             payload = packet.get("payload", {})
             chat_id = payload.get("chat_id")
-            sender = payload.get("sender")
+            sender_name = payload.get("sender")
             
             all_chats = get_all_chats()
             active_chat = get_chat_(all_chats, chat_id)
             
             # SECURITY CHECK
-            if active_chat and (sender in active_chat["members"]):
+            if active_chat and (sender_name in active_chat["members"]):
+                # BLOCK CHECK
+                # Find receiver(s)
+                receivers = [m for m in active_chat["members"] if m != sender_name]
+                sender_user = find_user(sender_name)
+                
+                can_send = True
+                if sender_user:
+                    sender_id = sender_user.get("user_id")
+                    for r_name in receivers:
+                        receiver_user = find_user(r_name)
+                        if receiver_user:
+                            receiver_id = receiver_user.get("user_id")
+                            status = block_repository.check_block_status(sender_id, receiver_id)
+                            if status != "none":
+                                can_send = False
+                                break
+                
+                if not can_send:
+                    response = {
+                        "type": "error",
+                        "payload": {"message": "Bu kullanıcıya mesaj gönderemezsiniz (Engelleme mevcut)."}
+                    }
+                    self.send_packet(conn, response)
+                    return
+
                 saved_message = save_message(payload)
                 
                 # Forward to online members
@@ -183,15 +209,29 @@ class ChatServer:
                 if chat_obj:
                     if chat_obj.get("chat_name"):
                         display_name = chat_obj.get("chat_name")
-                    elif len(chat_obj.get("members", [])) == 2:
-                        other_members = [m for m in chat_obj.get("members", []) if m != username]
-                        if other_members:
-                            display_name = other_members[0]
+                other_user_id = None
+                if chat_obj and len(chat_obj.get("members", [])) == 2:
+                    other_members = [m for m in chat_obj.get("members", []) if m != username]
+                    if other_members:
+                        display_name = other_members[0]
+                        ou = find_user(display_name)
+                        if ou:
+                            other_user_id = ou.get("user_id")
+
+                sender_user = find_user(username)
+                block_status = "none"
+                if sender_user and chat_obj and len(chat_obj.get("members", [])) == 2:
+                    other_member_name = [m for m in chat_obj.get("members", []) if m != username][0]
+                    other_user = find_user(other_member_name)
+                    if other_user:
+                        block_status = block_repository.check_block_status(sender_user.get("user_id"), other_user.get("user_id"))
 
                 packet_data.append({
                     "chat_id": chat_id,
                     "chat_name": display_name,
-                    "messages": chat_messages
+                    "other_user_id": other_user_id,
+                    "messages": chat_messages,
+                    "block_status": block_status
                 })
 
             response = {
@@ -253,13 +293,60 @@ class ChatServer:
             requester = payload.get("username", "")
 
             results = search_users(query, exclude_username=requester)
-            # burası hatalı aranan bir kullanıcın tüm bilegilerini client e gönderiyoruz
+            # Sanitize results (remove passwords)
+            sanitized_results = []
+            for u in results:
+                sanitized_results.append({
+                    "username": u.get("username"),
+                    "fullname": u.get("fullname"),
+                    "user_id": u.get("user_id")
+                })
+
             response = {
                 "type": "search_users_response",
                 "payload": {
                     "status": "success",
-                    "results": results
+                    "results": sanitized_results
                 }
+            }
+            self.send_packet(conn, response)
+
+        elif msg_type == "block_user_request":
+            payload = packet.get("payload", {})
+            blocker_id = payload.get("blocker_id")
+            blocked_id = payload.get("blocked_id")
+            
+            block_repository.add_or_update_block(blocker_id, blocked_id, status=True)
+            
+            response = {
+                "type": "block_user_response",
+                "payload": {"status": "success", "blocker_id": blocker_id, "blocked_id": blocked_id, "is_blocked": True}
+            }
+            self.send_packet(conn, response)
+
+        elif msg_type == "unblock_user_request":
+            payload = packet.get("payload", {})
+            blocker_id = payload.get("blocker_id")
+            blocked_id = payload.get("blocked_id")
+            
+            block_repository.add_or_update_block(blocker_id, blocked_id, status=False)
+            
+            response = {
+                "type": "block_user_response",
+                "payload": {"status": "success", "blocker_id": blocker_id, "blocked_id": blocked_id, "is_blocked": False}
+            }
+            self.send_packet(conn, response)
+
+        elif msg_type == "get_block_list_request":
+            payload = packet.get("payload", {})
+            user_id = payload.get("user_id")
+            
+            all_blocks = block_repository.get_all_blocks()
+            user_blocks = [b for b in all_blocks if str(b.get("blocker_id")) == str(user_id) and b.get("isBlocked")]
+            
+            response = {
+                "type": "get_block_list_response",
+                "payload": {"status": "success", "blocks": user_blocks}
             }
             self.send_packet(conn, response)
 

@@ -1,6 +1,3 @@
-from PyQt5.QtWidgets import QMessageBox
-from database import block_repository, user_repository
-
 class MessageController():
     def __init__(self, main_page, message_service):
         self.main_page = main_page
@@ -28,24 +25,6 @@ class MessageController():
                 actual_chat_id = getattr(widget, 'current_chat_id', chat_name)
                 break
                 
-        receiver_id = None
-        users = user_repository.get_all_users()
-        if users:
-            for user_data in users:
-                if str(user_data.get("username", "")).strip().lower() == str(chat_name).strip().lower():
-                    receiver_id = user_data.get("user_id")
-                    break
-
-        if receiver_id:
-            status = block_repository.check_block_status(self.current_user_id, receiver_id)
-            if status != "none":
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Warning)
-                msg.setWindowTitle("İşlem Engellendi")
-                msg.setText("Bu kullanıcıya mesaj gönderemezsiniz.")
-                msg.exec()
-                return
-
         self.message_service.send_chat_message(
             chat_id=actual_chat_id,
             content=text,
