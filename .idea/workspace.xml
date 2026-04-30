@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="e59a8d56-a0e4-43c1-abd6-4ce053e86f5d" name="Changes" comment="okundu kısmı düzeltildi">
+      <change beforePath="$PROJECT_DIR$/controllers/message_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/controllers/message_controller.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database/data/blocks.json" beforeDir="false" afterPath="$PROJECT_DIR$/database/data/blocks.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database/data/chats.json" beforeDir="false" afterPath="$PROJECT_DIR$/database/data/chats.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database/data/messages/chat_1777484342.json" beforeDir="false" afterPath="$PROJECT_DIR$/database/data/messages/chat_1777484342.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database/data/messages/chat_1777490124.json" beforeDir="false" afterPath="$PROJECT_DIR$/database/data/messages/chat_1777490124.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/mainPage.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/mainPage.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;nisanursahin60&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/ekinergenn/OnlineChatApp.git&quot;,
+    &quot;accountId&quot;: &quot;d1ffe95d-5011-4f33-a714-b08d94f8b3f0&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 0
+}</component>
+  <component name="ProjectId" id="3CLP5PS62Q97dZRz6dgsxMDRxfC" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.loginPage.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.mainPage.executor&quot;: &quot;Run&quot;,
+    &quot;Python.registerPage.executor&quot;: &quot;Run&quot;,
+    &quot;Python.server.executor&quot;: &quot;Run&quot;,
+    &quot;Python.server_run.executor&quot;: &quot;Run&quot;,
+    &quot;Python.user.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;
+  }
+}</component>
+  <component name="RunManager" selected="Python.main">
+    <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="OnlineChatApp" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="mainPage" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="OnlineChatApp" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/ui" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/ui/mainPage.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="server" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="OnlineChatApp" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/network" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/network/server.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="server_run" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="OnlineChatApp" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/server_run.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="user" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="OnlineChatApp" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/models" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/models/user.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.main" />
+        <item itemvalue="Python.server_run" />
+        <item itemvalue="Python.server" />
+        <item itemvalue="Python.user" />
+        <item itemvalue="Python.mainPage" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-b3d66beaba9a-c6efb3732140-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.26199.168" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="e59a8d56-a0e4-43c1-abd6-4ce053e86f5d" name="Changes" comment="" />
+      <created>1776161693004</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1776161693004</updated>
+    </task>
+    <task id="LOCAL-00001" summary="modülerlik tasarlandı.">
+      <option name="closed" value="true" />
+      <created>1776163663669</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1776163663669</updated>
+    </task>
+    <task id="LOCAL-00002" summary="login register ve main sayfası arayüzleri oluşturuldu ve geçişler eklendi.">
+      <option name="closed" value="true" />
+      <created>1776423181121</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1776423181121</updated>
+    </task>
+    <task id="LOCAL-00003" summary="cop kutusu ve engelleme eklendi. grup sohbeti olusturma eklendi ancak duzeltilecek">
+      <option name="closed" value="true" />
+      <created>1777205349351</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1777205349351</updated>
+    </task>
+    <task id="LOCAL-00004" summary="sohbet silme işlemi sunucuya paketini gönderebiliyor.">
+      <option name="closed" value="true" />
+      <created>1777206767242</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1777206767242</updated>
+    </task>
+    <task id="LOCAL-00005" summary="Login/Register gerçek veritabanına yazıyor&#10;Mesaj gönderme çalışıyor&#10;Grup oluşturma çalışıyor&#10;Sohbet silme çalışıyor&#10;users.json ve messages.json oluşuyor">
+      <option name="closed" value="true" />
+      <created>1777226969367</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1777226969367</updated>
+    </task>
+    <task id="LOCAL-00006" summary="mesaj history eklendi">
+      <option name="closed" value="true" />
+      <created>1777227663207</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1777227663207</updated>
+    </task>
+    <task id="LOCAL-00007" summary="mesajlara okundu bilgisi eklendi">
+      <option name="closed" value="true" />
+      <created>1777232292777</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1777232292777</updated>
+    </task>
+    <task id="LOCAL-00008" summary="fonksiyonlar kazandırıldı ama düzeltilecek">
+      <option name="closed" value="true" />
+      <created>1777244787438</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1777244787438</updated>
+    </task>
+    <task id="LOCAL-00009" summary="json dosyaları">
+      <option name="closed" value="true" />
+      <created>1777276204384</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1777276204384</updated>
+    </task>
+    <task id="LOCAL-00010" summary="mesaj gönderme hatası düzeltildi">
+      <option name="closed" value="true" />
+      <created>1777300875917</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1777300875917</updated>
+    </task>
+    <task id="LOCAL-00011" summary="last message gözüküyor">
+      <option name="closed" value="true" />
+      <created>1777301053728</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1777301053728</updated>
+    </task>
+    <task id="LOCAL-00012" summary="sohbet silme hatası düzeltildi">
+      <option name="closed" value="true" />
+      <created>1777302167120</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1777302167120</updated>
+    </task>
+    <task id="LOCAL-00013" summary="okundu kısmı eklendi">
+      <option name="closed" value="true" />
+      <created>1777495621670</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1777495621670</updated>
+    </task>
+    <task id="LOCAL-00014" summary="okundu kısmı düzeltildi">
+      <option name="closed" value="true" />
+      <created>1777531967555</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1777531967555</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="modülerlik tasarlandı." />
+    <MESSAGE value="login register ve main sayfası arayüzleri oluşturuldu ve geçişler eklendi." />
+    <MESSAGE value="cop kutusu ve engelleme eklendi. grup sohbeti olusturma eklendi ancak duzeltilecek" />
+    <MESSAGE value="sohbet silme işlemi sunucuya paketini gönderebiliyor." />
+    <MESSAGE value="Login/Register gerçek veritabanına yazıyor&#10;Mesaj gönderme çalışıyor&#10;Grup oluşturma çalışıyor&#10;Sohbet silme çalışıyor&#10;users.json ve messages.json oluşuyor" />
+    <MESSAGE value="mesaj history eklendi" />
+    <MESSAGE value="mesajlara okundu bilgisi eklendi" />
+    <MESSAGE value="fonksiyonlar kazandırıldı ama düzeltilecek" />
+    <MESSAGE value="json dosyaları" />
+    <MESSAGE value="mesaj gönderme hatası düzeltildi" />
+    <MESSAGE value="last message gözüküyor" />
+    <MESSAGE value="sohbet silme hatası düzeltildi" />
+    <MESSAGE value="okundu kısmı eklendi" />
+    <MESSAGE value="okundu kısmı düzeltildi" />
+    <option name="LAST_COMMIT_MESSAGE" value="okundu kısmı düzeltildi" />
+  </component>
+</project>

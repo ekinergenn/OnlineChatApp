@@ -1,0 +1,28 @@
+[
+  {
+    "message_id": "305fbc919c364e2b9888dc28ab6695cb",
+    "chat_id": "chat_1777534681",
+    "content": "şuan görüldü deniyorum",
+    "sender_id": 3,
+    "sender": "burakiskar",
+    "timestamp": 1777534689,
+    "status": "sent",
+    "read_by": [
+      "burakiskar",
+      "onursahin"
+    ]
+  },
+  {
+    "message_id": "7329e0bbe35c4a5fbfa034f8fb7f722a",
+    "chat_id": "chat_1777534681",
+    "content": "tamam ben de deniyorum",
+    "sender_id": 4,
+    "sender": "onursahin",
+    "timestamp": 1777534853,
+    "status": "sent",
+    "read_by": [
+      "onursahin",
+      "burakiskar"
+    ]
+  }
+]
