@@ -73,6 +73,7 @@ class MainApplicationWindow(QMainWindow):
 
         # logout sinyali
         self.main_page.profile_page.logout_signal.connect(self.handle_logout)
+        self.logreg_service.logout_requested_signal.connect(self.handle_logout)
 
     def handle_logout(self):
         # onaykutusu

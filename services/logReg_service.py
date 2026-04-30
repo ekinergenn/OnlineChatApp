@@ -3,6 +3,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 class LogRegService(QObject):
     login_response_signal = pyqtSignal(dict)
     register_response_signal = pyqtSignal(dict)
+    logout_requested_signal = pyqtSignal()
 
     def __init__(self, client, chat_service=None):
         super().__init__()
@@ -31,6 +32,18 @@ class LogRegService(QObject):
             }
         }
         self.client.send_data(packet)
+
+    def send_delete_account_request(self, username, user_id):
+        packet = {
+            "type": "delete_account_request",
+            "payload": {"username": username, "user_id": user_id}
+        }
+        self.client.send_data(packet)
+
+    def handle_logout_logic(self):
+        #hesap silinince çağırılır
+        print("[SERVICE] Hesap silme onaylandı, çıkış yapılıyor...")
+        self.logout_requested_signal.emit()
 
     def handle_server_response(self, payload: dict):
         self.login_response_signal.emit(payload)

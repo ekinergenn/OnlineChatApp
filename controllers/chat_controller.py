@@ -16,6 +16,7 @@ class ChatController():
         self.main_page.search_query_signal.connect(self.handle_search)
         self.main_page.start_chat_signal.connect(self.handle_start_chat)
         self.main_page.delete_chat_signal.connect(self.handle_delete_chat)
+        self.main_page.profile_page.delete_account_signal.connect(self.handle_delete_account)
         
         # Service signals
         self.chat_service.user_chats_loaded_signal.connect(self.load_user_chats)
@@ -161,3 +162,10 @@ class ChatController():
             self.main_page.remove_chat_from_ui(chat_name)
         else:
             QMessageBox.warning(self.main_page, "Hata", "Sohbet silinemedi.")
+
+    def handle_delete_account(self):
+        # LogRegService üzerinden sunucuya istek gönder
+        self.chat_service.client.send_data({
+            "type": "delete_account_request",
+            "payload": {"username": self.current_username, "user_id": self.current_user_id}
+        })

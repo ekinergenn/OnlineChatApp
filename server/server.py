@@ -3,7 +3,7 @@ import threading
 import json
 import time
 import os
-from database.user_repository import find_user, create_user, search_users
+from database.user_repository import find_user, create_user, search_users, delete_user
 from database.message_repository import save_message, get_messages, mark_messages_as_read
 from database.chat_repository import create_chat, get_all_chats, get_chat_, get_user_chats, delete_chat
 from database import block_repository
@@ -368,6 +368,23 @@ class ChatServer:
                 "type": "get_block_list_response",
                 "payload": {"status": "success", "blocks": user_blocks}
             }
+            self.send_packet(conn, response)
+
+        elif msg_type == "delete_account_request":
+            payload = packet.get("payload", {})
+            username = payload.get("username")
+            print(f"[DEBUG] Silme isteği geldi. Kullanıcı: '{username}'")
+
+            # Repository fonksiyonunu çağır
+            from database.user_repository import delete_user
+            success = delete_user(username)
+            if success:
+                print(f"[DEBUG] Silme BAŞARILI.")
+                response = {"type": "delete_account_response", "payload": {"status": "success"}}
+            else:
+                print(f"[DEBUG] Silme BAŞARISIZ. Kullanıcı bulunamadı veya dosya yazılamadı.")
+                response = {"type": "delete_account_response", "payload": {"status": "fail"}}
+
             self.send_packet(conn, response)
 
         # elif msg_type == "create_chat_request":

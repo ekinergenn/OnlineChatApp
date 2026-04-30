@@ -1,3 +1,5 @@
+import os
+
 from database.db import read_json, write_json
 
 FILENAME = "users.json"
@@ -55,3 +57,21 @@ def search_users(query: str, exclude_username: str = None) -> list:
             results.append(user)
 
     return results
+
+def delete_user(username):
+    users = read_json(FILENAME)
+    initial_count = len(users)
+
+    target_name = str(username).strip().lower()
+    new_users = [
+        u for u in users
+        if str(u.get("username")).strip().lower() != target_name
+    ]
+
+    if len(new_users) < initial_count:
+        write_json(FILENAME, new_users)
+        print("[DEBUG] Kullanıcı silindi.")
+        return True
+
+    print("[DEBUG] Kullanıcı bulunamadı.")
+    return False

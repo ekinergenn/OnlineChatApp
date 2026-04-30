@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QFrame, QScrollArea, QLineEdit, QSpacerItem, QSizePolicy
+    QPushButton, QFrame, QScrollArea, QLineEdit, QSpacerItem, QSizePolicy, QMessageBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QCursor, QFont
@@ -9,6 +9,7 @@ from PyQt5.QtGui import QCursor, QFont
 
 class ProfilePageUI(QWidget):
     logout_signal = pyqtSignal()
+    delete_account_signal = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -74,10 +75,9 @@ class ProfilePageUI(QWidget):
         self.add_section_title("Güvenlik")
         self.pass_input = self.create_input_group("Yeni Şifre", "••••••••", is_password=True)
 
-        # 4. BAĞLI HESAPLAR
-        self.add_section_title("Bağlı Hesaplar")
-        self.insta_input = self.create_input_group("Instagram", "@kullaniciadi")
-        self.link_input = self.create_input_group("LinkedIn", "linkedin.com/in/profil")
+        # 4. e-posta
+        self.add_section_title("E-Posta Adresi")
+        self.email_input = self.create_input_group("E-Posta", "kullanici@gmail.com")
 
         #5.BUTONLAR
         buttons_layout = QHBoxLayout()
@@ -103,9 +103,6 @@ class ProfilePageUI(QWidget):
         buttons_layout.addWidget(logout_btn)
         self.container_layout.addLayout(buttons_layout)
 
-        #sinyaller
-        logout_btn.clicked.connect(self.logout_signal.emit)
-
         #6. HESABI SİL
         delete_btn = QPushButton("Hesabı Kalıcı Olarak Sil")
         delete_btn.setCursor(QCursor(Qt.PointingHandCursor))
@@ -113,8 +110,21 @@ class ProfilePageUI(QWidget):
             "color: #d32f2f; border: none; font-size: 13px; text-decoration: underline; margin-top: 20px;")
         self.container_layout.addWidget(delete_btn, alignment=Qt.AlignCenter)
 
+        # sinyaller
+        logout_btn.clicked.connect(self.logout_signal.emit)
+        delete_btn.clicked.connect(self.handle_delete_click)
+
         scroll.setWidget(container)
         self.main_layout.addWidget(scroll)
+
+    def handle_delete_click(self):
+        reply = QMessageBox.question(
+            self, 'Hesabı Sil',
+            "Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.delete_account_signal.emit()
 
     def add_section_title(self, text):
         title = QLabel(text)

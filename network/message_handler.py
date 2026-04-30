@@ -45,5 +45,10 @@ class MessageHandler:
             print(f"[HATA] {msg}")
             # Opsiyonel: UI'da gösterilmek üzere bir sinyal fırlatılabilir
 
+        elif msg_type == "delete_account_response":
+            if payload.get("status") == "success":
+                # main_page içinden metodla login ekranına yönlendir
+                self.services['logreg_service'].handle_logout_logic()
+
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")
