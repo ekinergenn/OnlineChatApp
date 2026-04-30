@@ -10,6 +10,7 @@ class ChatService(QObject):
     def __init__(self, client):
         super().__init__()
         self.client = client
+        self._pending_delete_chat_name = None
 
     def send_get_user_chats_request(self, username: str):
         packet = {
@@ -51,3 +52,16 @@ class ChatService(QObject):
     def handle_search_response(self, payload: dict):
         results = payload.get("results", [])
         self.search_results_signal.emit(results)
+
+    def send_delete_chat_request(self, chat_id: str, chat_name: str):
+        self._pending_delete_chat_name = chat_name  # ← chat_name saklıyoruz
+        packet = {
+            "type": "delete_chat_request",
+            "payload": {"chat_id": chat_id}
+        }
+        self.client.send_data(packet)
+
+    def handle_delete_chat_response(self, payload: dict):
+        payload["chat_name"] = self._pending_delete_chat_name  # ← chat_name ekliyoruz
+        self._pending_delete_chat_name = None
+        self.delete_chat_response_signal.emit(payload)

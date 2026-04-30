@@ -288,8 +288,17 @@ class ChatServer:
             chat_id = payload.get("chat_id")
             print(f"[SİLME] '{chat_id}' siliniyor...")
 
-            # delete_chat_messages(chat_id)  # messages.json'dan sil
-            delete_chat(chat_id)  # chats.json'dan sil
+            delete_chat(chat_id)
+
+            import os
+            BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            msg_file = os.path.join(BASE_DIR, "database", "data", "messages", f"{chat_id}.json")
+            print(f"[DEBUG] Aranan path: {msg_file}")
+            if os.path.exists(msg_file):
+                os.remove(msg_file)
+                print(f"[SİLME] '{chat_id}.json' mesaj dosyası silindi.")
+            else:
+                print(f"[UYARI] Dosya bulunamadı: {msg_file}")
 
             print(f"[SİLME] '{chat_id}' silindi.")
             response = {

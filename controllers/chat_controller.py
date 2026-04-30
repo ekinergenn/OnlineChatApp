@@ -15,11 +15,13 @@ class ChatController():
         self.main_page.block_user_signal.connect(self.handle_block_user)
         self.main_page.search_query_signal.connect(self.handle_search)
         self.main_page.start_chat_signal.connect(self.handle_start_chat)
+        self.main_page.delete_chat_signal.connect(self.handle_delete_chat)
         
         # Service signals
         self.chat_service.user_chats_loaded_signal.connect(self.load_user_chats)
         self.chat_service.search_results_signal.connect(self.main_page.show_search_results)
         self.chat_service.create_chat_response_signal.connect(self.on_chat_created)
+        self.chat_service.delete_chat_response_signal.connect(self.on_chat_deleted)
         if self.block_service:
             self.block_service.block_status_changed_signal.connect(self.on_block_status_received)
 
@@ -134,3 +136,28 @@ class ChatController():
                 if hasattr(widget, 'contact_name') and widget.contact_name == target_name:
                     widget.current_chat_id = chat_id 
                     break
+
+    # TAMAMEN YENİ FONKSİYON
+    def handle_delete_chat(self, chat_name: str):
+        chat_id = None
+        for i in range(self.main_page.chat_screens_stack.count()):
+            widget = self.main_page.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == chat_name:
+                chat_id = getattr(widget, 'current_chat_id', None)
+                break
+
+        if not chat_id:
+            self.main_page.remove_chat_from_ui(chat_name)
+            return
+
+        self.chat_service.send_delete_chat_request(chat_id, chat_name)
+
+    # TAMAMEN YENİ FONKSİYON
+    def on_chat_deleted(self, payload: dict):
+        status = payload.get("status")
+        chat_name = payload.get("chat_name")
+
+        if status == "success" and chat_name:
+            self.main_page.remove_chat_from_ui(chat_name)
+        else:
+            QMessageBox.warning(self.main_page, "Hata", "Sohbet silinemedi.")
