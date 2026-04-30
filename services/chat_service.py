@@ -6,6 +6,8 @@ class ChatService(QObject):
     user_chats_loaded_signal = pyqtSignal(list)
     search_results_signal = pyqtSignal(list)
     create_chat_response_signal = pyqtSignal(dict) # Sadece tekli sohbet için
+    all_users_loaded_signal = pyqtSignal(list)
+    create_group_response_signal = pyqtSignal(dict)
 
     def __init__(self, client):
         super().__init__()
@@ -53,11 +55,11 @@ class ChatService(QObject):
         results = payload.get("results", [])
         self.search_results_signal.emit(results)
 
-    def send_delete_chat_request(self, chat_id: str, chat_name: str):
-        self._pending_delete_chat_name = chat_name  # ← chat_name saklıyoruz
+    def send_delete_chat_request(self, chat_id: str, chat_name: str, username: str = ""):
+        self._pending_delete_chat_name = chat_name
         packet = {
             "type": "delete_chat_request",
-            "payload": {"chat_id": chat_id}
+            "payload": {"chat_id": chat_id, "username": username}
         }
         self.client.send_data(packet)
 
@@ -65,3 +67,27 @@ class ChatService(QObject):
         payload["chat_name"] = self._pending_delete_chat_name  # ← chat_name ekliyoruz
         self._pending_delete_chat_name = None
         self.delete_chat_response_signal.emit(payload)
+
+    def send_get_all_users_request(self, username: str):
+        packet = {
+            "type": "get_all_users_request",
+            "payload": {"username": username}
+        }
+        self.client.send_data(packet)
+
+    def handle_get_all_users_response(self, payload: dict):
+        users = payload.get("users", [])
+        self.all_users_loaded_signal.emit(users)
+
+    def send_create_group_request(self, group_name: str, members: list):
+        packet = {
+            "type": "create_group_request",
+            "payload": {
+                "group_name": group_name,
+                "members": members
+            }
+        }
+        self.client.send_data(packet)
+
+    def handle_create_group_response(self, payload: dict):
+        self.create_group_response_signal.emit(payload)

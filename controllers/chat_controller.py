@@ -25,6 +25,10 @@ class ChatController():
         self.chat_service.delete_chat_response_signal.connect(self.on_chat_deleted)
         if self.block_service:
             self.block_service.block_status_changed_signal.connect(self.on_block_status_received)
+        self.chat_service.all_users_loaded_signal.connect(self.on_all_users_loaded)
+        self.chat_service.create_group_response_signal.connect(self.on_group_created)
+        self.main_page.request_all_users_signal.connect(self.handle_request_all_users)
+        self.main_page.create_group_signal.connect(self.handle_create_group)
 
     def set_current_user(self, profile: dict):
         self.current_user_id = profile.get("user_id")
@@ -86,15 +90,17 @@ class ChatController():
             chat_name = chat.get("chat_name", chat_id)
             other_user_id = chat.get("other_user_id")
             block_status = chat.get("block_status", "none")
+            is_group = chat.get("is_group", False)
             
             # Add chat to UI
-            self.main_page.add_new_chat_to_ui(chat_name)
+            self.main_page.add_new_chat_to_ui(chat_name, is_group=is_group)
             
             # Widget'a ID ve block bilgisini göm
             for i in range(self.main_page.chat_screens_stack.count()):
                 widget = self.main_page.chat_screens_stack.widget(i)
                 if getattr(widget, 'contact_name', None) == chat_name:
                     widget.other_user_id = str(other_user_id) if other_user_id else None
+                    widget.is_group = is_group
                     if block_status == "blocked_by_me":
                         widget.block_action.setText("🔓 Engeli Kaldır")
                     else:
@@ -151,7 +157,7 @@ class ChatController():
             self.main_page.remove_chat_from_ui(chat_name)
             return
 
-        self.chat_service.send_delete_chat_request(chat_id, chat_name)
+        self.chat_service.send_delete_chat_request(chat_id, chat_name, self.current_username)
 
     # TAMAMEN YENİ FONKSİYON
     def on_chat_deleted(self, payload: dict):
@@ -169,3 +175,31 @@ class ChatController():
             "type": "delete_account_request",
             "payload": {"username": self.current_username, "user_id": self.current_user_id}
         })
+
+    def handle_request_all_users(self):
+        self.chat_service.send_get_all_users_request(self.current_username or "")
+
+    def on_all_users_loaded(self, users: list):
+        from ui.groupDialog import GroupCreationDialog
+        dialog = GroupCreationDialog(users, self.current_username, parent=self.main_page)
+        dialog.create_group_signal.connect(self.handle_create_group)
+        dialog.exec_()
+
+    def handle_create_group(self, group_name: str, selected_members: list):
+        all_members = [self.current_username] + selected_members
+        self.chat_service.send_create_group_request(group_name, all_members)
+
+    def on_group_created(self, payload: dict):
+        if payload.get("status") == "success":
+            group_name = payload.get("group_name")
+            chat_id = payload.get("chat_id")
+            self.main_page.add_new_chat_to_ui(group_name, is_group=True)
+            for i in range(self.main_page.chat_screens_stack.count()):
+                widget = self.main_page.chat_screens_stack.widget(i)
+                if getattr(widget, 'contact_name', None) == group_name:
+                    widget.current_chat_id = chat_id
+                    widget.is_group = True
+                    break
+        else:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(self.main_page, "Hata", "Grup oluşturulamadı.")

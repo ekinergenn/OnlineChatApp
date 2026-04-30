@@ -216,12 +216,11 @@ class ChatServer:
                 chat_messages = get_messages(chat_id)
                 chat_obj = get_chat_(all_chats, chat_id)
                 display_name = chat_id
-                
-                if chat_obj:
-                    if chat_obj.get("chat_name"):
-                        display_name = chat_obj.get("chat_name")
+
                 other_user_id = None
-                if chat_obj and len(chat_obj.get("members", [])) == 2:
+                if chat_obj and chat_obj.get("is_group"):
+                    display_name = chat_obj.get("chat_name") or chat_id
+                elif chat_obj and len(chat_obj.get("members", [])) == 2:
                     other_members = [m for m in chat_obj.get("members", []) if m != username]
                     if other_members:
                         display_name = other_members[0]
@@ -242,7 +241,8 @@ class ChatServer:
                     "chat_name": display_name,
                     "other_user_id": other_user_id,
                     "messages": chat_messages,
-                    "block_status": block_status
+                    "block_status": block_status,
+                    "is_group": chat_obj.get("is_group", False) if chat_obj else False
                 })
 
             response = {
@@ -286,21 +286,40 @@ class ChatServer:
         elif msg_type == "delete_chat_request":
             payload = packet.get("payload", {})
             chat_id = payload.get("chat_id")
-            print(f"[SİLME] '{chat_id}' siliniyor...")
+            username = payload.get("username", "")
+            print(f"[SİLME] '{chat_id}' — '{username}' için siliniyor...")
 
-            delete_chat(chat_id)
+            all_chats = get_all_chats()
+            chat_obj = get_chat_(all_chats, chat_id)
 
-            import os
-            BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            msg_file = os.path.join(BASE_DIR, "database", "data", "messages", f"{chat_id}.json")
-            print(f"[DEBUG] Aranan path: {msg_file}")
-            if os.path.exists(msg_file):
-                os.remove(msg_file)
-                print(f"[SİLME] '{chat_id}.json' mesaj dosyası silindi.")
+            if chat_obj and chat_obj.get("is_group"):
+                # Grup sohbeti: sadece üyeden çıkar, dosyayı silme
+                members = chat_obj.get("members", [])
+                if username in members:
+                    members.remove(username)
+                    chat_obj["members"] = members
+                    from database.db import write_json
+                    write_json("chats.json", all_chats)
+                    print(f"[SİLME] '{username}' gruptan çıkarıldı, grup devam ediyor.")
+
+                # Eğer grupta kimse kalmadıysa tamamen sil
+                if not members:
+                    delete_chat(chat_id)
+                    import os
+                    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    msg_file = os.path.join(BASE_DIR, "database", "data", "messages", f"{chat_id}.json")
+                    if os.path.exists(msg_file):
+                        os.remove(msg_file)
             else:
-                print(f"[UYARI] Dosya bulunamadı: {msg_file}")
+                # Birebir sohbet: tamamen sil
+                delete_chat(chat_id)
+                import os
+                BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                msg_file = os.path.join(BASE_DIR, "database", "data", "messages", f"{chat_id}.json")
+                if os.path.exists(msg_file):
+                    os.remove(msg_file)
+                    print(f"[SİLME] '{chat_id}.json' mesaj dosyası silindi.")
 
-            print(f"[SİLME] '{chat_id}' silindi.")
             response = {
                 "type": "delete_chat_response",
                 "payload": {"status": "success", "chat_id": chat_id}
@@ -369,6 +388,65 @@ class ChatServer:
                 "payload": {"status": "success", "blocks": user_blocks}
             }
             self.send_packet(conn, response)
+
+        elif msg_type == "get_all_users_request":
+            payload = packet.get("payload", {})
+            requester = payload.get("username", "")
+
+            from database.user_repository import get_all_users
+            all_users = get_all_users()
+
+            sanitized = []
+            for u in all_users:
+                if u.get("username") != requester:
+                    sanitized.append({
+                        "username": u.get("username"),
+                        "fullname": u.get("fullname"),
+                        "user_id": u.get("user_id")
+                    })
+
+            response = {
+                "type": "get_all_users_response",
+                "payload": {"status": "success", "users": sanitized}
+            }
+            self.send_packet(conn, response)
+
+        elif msg_type == "create_group_request":
+            payload = packet.get("payload", {})
+            group_name = payload.get("group_name", "")
+            members = payload.get("members", [])
+
+            import time
+            new_chat_id = f"group_{int(time.time())}"
+
+            try:
+                create_chat(new_chat_id, members, is_group=True, chat_name=group_name)
+
+                from database.db import write_json
+                write_json(f"messages/{new_chat_id}.json", [])
+
+                response = {
+                    "type": "create_group_response",
+                    "payload": {
+                        "status": "success",
+                        "chat_id": new_chat_id,
+                        "group_name": group_name,
+                        "members": members
+                    }
+                }
+                self.send_packet(conn, response)
+
+                for member in members:
+                    if member in self.online_users and self.online_users[member] != conn:
+                        self.send_packet(self.online_users[member], response)
+
+            except Exception as e:
+                print(f"[HATA] Grup oluşturulamadı: {e}")
+                response = {
+                    "type": "create_group_response",
+                    "payload": {"status": "fail", "message": str(e)}
+                }
+                self.send_packet(conn, response)
 
         elif msg_type == "delete_account_request":
             payload = packet.get("payload", {})

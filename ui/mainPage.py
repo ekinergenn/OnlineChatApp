@@ -28,6 +28,8 @@ class MainPageUI(QWidget):
     load_history_signal = pyqtSignal(str)
     search_query_signal = pyqtSignal(str)
     start_chat_signal = pyqtSignal(str)
+    create_group_signal = pyqtSignal(str, list)  # (group_name, [members])
+    request_all_users_signal = pyqtSignal()  # + butonuna basınca sunucudan kullanıcı listesi iste
 
 
     def __init__(self):
@@ -140,6 +142,7 @@ class MainPageUI(QWidget):
         title_label.setStyleSheet("font-size: 22px; font-weight: bold; color: #111b21;")
 
         self.add_chat_btn = QPushButton("➕")
+        self.add_chat_btn.clicked.connect(self.request_all_users_signal.emit)
         self.add_chat_btn.setFixedSize(35, 35)
         self.add_chat_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self.add_chat_btn.setStyleSheet(
@@ -196,7 +199,7 @@ class MainPageUI(QWidget):
 
         self.chats_page_layout.addWidget(chat_list_frame)
 
-    def create_chat_item(self, name, last_message, time, unread_count, stack_index):
+    def create_chat_item(self, name, last_message, time, unread_count, stack_index, is_group=False):
         # Tıklanabilir ClickableFrame kullanıyoruz
         item_frame = ClickableFrame()
         item_frame.contact_name = name
@@ -216,7 +219,7 @@ class MainPageUI(QWidget):
         layout.setSpacing(15)
 
         # Avatar
-        avatar = QLabel("👤")
+        avatar = QLabel("👥" if is_group else "👤")
         avatar.setFixedSize(50, 50)
         avatar.setAlignment(Qt.AlignCenter)
         avatar.setStyleSheet("background-color: #dfe5e7; border-radius: 25px; font-size: 24px;")
@@ -268,7 +271,7 @@ class MainPageUI(QWidget):
 
         return item_frame
 
-    def create_individual_chat_screen(self, contact_name):
+    def create_individual_chat_screen(self, contact_name, is_group=False):
         chat_frame = QFrame()
         chat_frame.setStyleSheet("background-color: #efeae2;")
         chat_frame.contact_name = contact_name  # ← arama için etiket
@@ -284,7 +287,7 @@ class MainPageUI(QWidget):
         top_layout = QHBoxLayout(top_bar)
         top_layout.setContentsMargins(10, 0, 10, 0)
 
-        avatar = QLabel("👤")
+        avatar = QLabel("👥" if is_group else "👤")
         avatar.setFixedSize(40, 40)
         avatar.setStyleSheet("background-color: #dfe5e7; border-radius: 20px; font-size: 20px;")
         avatar.setAlignment(Qt.AlignCenter)
@@ -395,17 +398,18 @@ class MainPageUI(QWidget):
             print(f"[{chat_name}] sohbeti silindi!")
             self.delete_chat_signal.emit(chat_name)
 
-    def add_new_chat_to_ui(self, chat_name, last_message=""):
+    def add_new_chat_to_ui(self, chat_name, last_message="", is_group=False):
         new_stack_index = self.chat_screens_stack.count()
         new_chat_item = self.create_chat_item(
             name=chat_name,
-            last_message=last_message,  # ← boş bırak
+            last_message=last_message,
             time="",
             unread_count=0,
-            stack_index=new_stack_index
+            stack_index=new_stack_index,
+            is_group=is_group
         )
         self.scroll_layout.insertWidget(0, new_chat_item)
-        new_chat_screen = self.create_individual_chat_screen(chat_name)
+        new_chat_screen = self.create_individual_chat_screen(chat_name, is_group=is_group)
         self.chat_screens_stack.addWidget(new_chat_screen)
         self.chat_screens_stack.setCurrentIndex(new_stack_index)
 
@@ -415,7 +419,7 @@ class MainPageUI(QWidget):
             self.send_message_signal.emit(chat_name, text)
             input_field.clear()  # Gönderdikten sonra kutuyu temizle
 
-    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None, timestamp=None):
+    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None, timestamp=None, sender_name=None):
         if read_by is None:
             read_by = []
 
@@ -427,7 +431,7 @@ class MainPageUI(QWidget):
 
                 stretch_item = msg_layout.takeAt(msg_layout.count() - 1)
 
-                bubble, status_label = self._create_message_bubble(content, is_mine, status, read_by, timestamp)
+                bubble, status_label = self._create_message_bubble(content, is_mine, status, read_by, timestamp, sender_name)
                 msg_layout.addWidget(bubble)
 
                 msg_layout.addStretch()
@@ -443,7 +447,7 @@ class MainPageUI(QWidget):
 
         self.update_chat_last_message(chat_name, content, is_mine)
 
-    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None, timestamp=None):
+    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None, timestamp=None, sender_name=None):
         if read_by is None:
             read_by = []
 
@@ -472,6 +476,20 @@ class MainPageUI(QWidget):
         bubble_layout = QVBoxLayout(bubble_frame)
         bubble_layout.setContentsMargins(10, 6, 10, 5)
         bubble_layout.setSpacing(3)
+
+        if sender_name and not is_mine:
+            sender_label = QLabel(sender_name)
+            sender_label.setStyleSheet("""
+                QLabel {
+                    background: transparent;
+                    color: #3b82f6;
+                    font-size: 12px;
+                    font-weight: bold;
+                    padding: 0px;
+                }
+            """)
+            sender_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+            bubble_layout.addWidget(sender_label)
 
         text_label = QLabel(content)
         text_label.setWordWrap(True)

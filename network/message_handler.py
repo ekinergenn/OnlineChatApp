@@ -50,5 +50,11 @@ class MessageHandler:
                 # main_page içinden metodla login ekranına yönlendir
                 self.services['logreg_service'].handle_logout_logic()
 
+        elif msg_type == "get_all_users_response":
+            self.services['chat_service'].handle_get_all_users_response(payload)
+
+        elif msg_type == "create_group_response":
+            self.services['chat_service'].handle_create_group_response(payload)
+
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")

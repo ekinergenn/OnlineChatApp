@@ -91,8 +91,17 @@ class MessageController():
         actual_read_by = [u for u in payload.get("read_by", []) if u != self.current_username]
 
         # 5. Mesajı arayüze ekle
+        # Grup sohbeti mi kontrol et
+        is_group = False
+        for i in range(self.main_page.chat_screens_stack.count()):
+            w = self.main_page.chat_screens_stack.widget(i)
+            if getattr(w, 'current_chat_id', None) == chat_id or getattr(w, 'contact_name', None) == chat_name:
+                is_group = getattr(w, 'is_group', False)
+                break
+
         self.main_page.add_message_to_ui(chat_name, content, is_mine, status, read_by=actual_read_by,
-                                         message_id=message_id, timestamp=payload.get("timestamp"))
+                                         message_id=message_id, timestamp=payload.get("timestamp"),
+                                         sender_name=sender if (is_group and not is_mine) else None)
 
         # 6. Okunmamış mesaj sayısı ve "Görüldü" gönderme işlemleri (Sadece karşıdan gelen mesajlar için)
         if not is_mine:
@@ -125,6 +134,13 @@ class MessageController():
                     target_widget.unread_message_ids.append(message_id)
 
     def load_historical_messages(self, chat_name: str, chat_id: str, messages: list):
+        is_group = False
+        for i in range(self.main_page.chat_screens_stack.count()):
+            w = self.main_page.chat_screens_stack.widget(i)
+            if getattr(w, 'contact_name', None) == chat_name:
+                is_group = getattr(w, 'is_group', False)
+                break
+
         for i in range(self.main_page.chat_screens_stack.count()):
             widget = self.main_page.chat_screens_stack.widget(i)
             if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
@@ -146,7 +162,8 @@ class MessageController():
             # Varsayılan durumu "read" yerine "delivered" yapıyoruz
             self.main_page.add_message_to_ui(chat_name, message.get("content"), is_mine,
                                              message.get("status", "delivered"), read_by=actual_read_by,
-                                             timestamp=message.get("timestamp"))
+                                             timestamp=message.get("timestamp"),
+                                             sender_name=message.get("sender") if (is_group and not is_mine) else None)
         
         self.main_page.update_chat_unread_count(chat_name, unread_count)
 
