@@ -24,5 +24,70 @@
       "nisanursahin",
       "ekinergen"
     ]
+  },
+  {
+    "message_id": "7bb9cb3f2db246568930dc6dfad25574",
+    "chat_id": "chat_1777490124",
+    "content": "nbr knkm",
+    "sender_id": 1,
+    "sender": "nisanursahin",
+    "timestamp": 1777529196,
+    "status": "sent",
+    "read_by": [
+      "nisanursahin",
+      "ekinergen"
+    ]
+  },
+  {
+    "message_id": "8e582a69592a477f876d68734267f64a",
+    "chat_id": "chat_1777490124",
+    "content": "nbr ekin",
+    "sender_id": 1,
+    "sender": "nisanursahin",
+    "timestamp": 1777530079,
+    "status": "sent",
+    "read_by": [
+      "nisanursahin",
+      "ekinergen"
+    ]
+  },
+  {
+    "message_id": "ae62074f9c5b428386935a18e897df22",
+    "chat_id": "chat_1777490124",
+    "content": "knk",
+    "sender_id": 1,
+    "sender": "nisanursahin",
+    "timestamp": 1777530372,
+    "status": "sent",
+    "read_by": [
+      "nisanursahin",
+      "ekinergen"
+    ]
+  },
+  {
+    "message_id": "d6e917cf6f33426fa7b48c1799f355e3",
+    "chat_id": "chat_1777490124",
+    "content": "naber",
+    "sender_id": 1,
+    "sender": "nisanursahin",
+    "timestamp": 1777530462,
+    "status": "sent",
+    "read_by": [
+      "nisanursahin",
+      "ekinergen"
+    ]
+  },
+  {
+    "message_id": "3b449b1d5c794982a9d5edac9286a923",
+    "chat_id": "chat_1777490124",
+    "content": "selam",
+    "sender_id": 1,
+    "sender": "nisanursahin",
+    "timestamp": 1777530544,
+    "status": "sent",
+    "read_by": [
+      "nisanursahin",
+      "ekinergen"
+    ]
   }
 ]

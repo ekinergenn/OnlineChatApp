@@ -96,7 +96,8 @@ class MessageController():
                         target_widget = w
                         break
                         
-        self.main_page.add_message_to_ui(chat_name, content, is_mine, status)
+        self.main_page.add_message_to_ui(chat_name, content, is_mine, status, read_by=payload.get("read_by", []),
+    message_id=message_id)
         
         if not is_mine:
             # Check if chat is currently active
@@ -140,7 +141,7 @@ class MessageController():
             if not is_mine and self.current_username not in message.get("read_by", []):
                 unread_count += 1
             
-            self.main_page.add_message_to_ui(chat_name, message.get("content"), is_mine, message.get("status", "read"))
+            self.main_page.add_message_to_ui(chat_name, message.get("content"), is_mine, message.get("status", "read"), read_by=message.get("read_by", []))
         
         self.main_page.update_chat_unread_count(chat_name, unread_count)
 
@@ -169,4 +170,15 @@ class MessageController():
                 break
 
     def on_messages_read_receipt(self, payload: dict):
-        pass # Optional: update UI for read receipts
+        chat_id = payload.get("chat_id")
+        message_ids = payload.get("message_ids", [])
+
+        # chat_id'den chat_name bul
+        chat_name = chat_id
+        for i in range(self.main_page.chat_screens_stack.count()):
+            widget = self.main_page.chat_screens_stack.widget(i)
+            if getattr(widget, 'current_chat_id', None) == chat_id:
+                chat_name = getattr(widget, 'contact_name', chat_id)
+                break
+
+        self.main_page.update_message_read_status(chat_name, message_ids, payload.get("read_by", ""))
