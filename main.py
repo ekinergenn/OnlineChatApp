@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QMessageBox
 import threading
 from network import Client
 from services.block_service import BlockService
@@ -70,6 +70,25 @@ class MainApplicationWindow(QMainWindow):
             )
             self.listen_thread.daemon = True
             self.listen_thread.start()
+
+        # logout sinyali
+        self.main_page.profile_page.logout_signal.connect(self.handle_logout)
+
+    def handle_logout(self):
+        # onaykutusu
+        reply = QMessageBox.question(
+            self, 'Oturumu Kapat',
+            "Oturumu kapatmak istediğinize emin misiniz?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            #Login sayfasına dön indeks 0
+            self.stacked_widget.setCurrentIndex(0)
+            self.login_page.clear_fields()
+
+            #kullanıcı verisini temizle
+            self.current_user = None
 
     def on_login_success(self, user_info: dict):
         """Login başarılı olunca çağrılır."""

@@ -87,3 +87,7 @@ class LoginPageUI(QWidget):
         card_layout.addLayout(register_layout)
 
         self.main_layout.addWidget(self.card)
+
+    def clear_fields(self):
+        self.username_input.clear()
+        self.password_input.clear()

@@ -3,11 +3,13 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFrame, QScrollArea, QLineEdit, QSpacerItem, QSizePolicy
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QCursor, QFont
 
 
 class ProfilePageUI(QWidget):
+    logout_signal = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()
@@ -100,6 +102,9 @@ class ProfilePageUI(QWidget):
         buttons_layout.addWidget(save_btn)
         buttons_layout.addWidget(logout_btn)
         self.container_layout.addLayout(buttons_layout)
+
+        #sinyaller
+        logout_btn.clicked.connect(self.logout_signal.emit)
 
         #6. HESABI SİL
         delete_btn = QPushButton("Hesabı Kalıcı Olarak Sil")
