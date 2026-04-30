@@ -4,8 +4,8 @@ class MessageHandler:
     def __init__(self, services):
         self.services = services
 
-    def handle_incoming_data(self, raw_bytes: bytes):
-        packet = Protocol.parse_packet(raw_bytes)
+    def handle_incoming_data(self, raw_str: str):
+        packet = Protocol.parse_packet(raw_str)
         msg_type = packet.get("type")
         payload = packet.get("payload")
         print(packet)

@@ -1,15 +1,11 @@
 import socket
 import threading
 import json
-from database.user_repository import find_user, create_user
-from database.message_repository import save_message, get_messages
-
-from database.user_repository import *
-from database.chat_repository import *
-from database.user_repository import find_user, create_user
-# server.py'ın EN ÜSTÜNE bu importları ekle (fonksiyon içinde değil!)
+import time
+import os
+from database.user_repository import find_user, create_user, search_users
 from database.message_repository import save_message, get_messages, mark_messages_as_read
-from database.chat_repository import create_chat, get_user_chats, delete_chat
+from database.chat_repository import create_chat, get_all_chats, get_chat_, get_user_chats, delete_chat
 from database import block_repository
 
 
@@ -36,6 +32,7 @@ class ChatServer:
             thread.start()
 
     def handle_client(self, conn, addr):
+        buffer = ""
         while True:
             try:
                 # 1. Ham veriyi al
@@ -43,25 +40,39 @@ class ChatServer:
                 if not raw_data:
                     break
 
-                # 2. Protokolüne uygun olarak veriyi parçala (<END> ayırıcısını kontrol et)
-                decoded_data = raw_data.decode('utf-8')
-                messages = decoded_data.split("<END>")
-
-                for msg in messages:
+                # 2. Protokolüne uygun olarak veriyi tamponda biriktir ve parçala
+                buffer += raw_data.decode('utf-8')
+                
+                while "<END>" in buffer:
+                    msg, buffer = buffer.split("<END>", 1)
                     if not msg: continue
                     
-                    packet = json.loads(msg)
-                    print(f"[GELEN PAKET] {addr}: {packet}")
-
-                    # 3. Gelen paketi işle ve cevap hazırla
-                    self.process_request(conn, packet)
+                    try:
+                        packet = json.loads(msg)
+                        print(f"[GELEN PAKET] {addr}: {packet}")
+                        # 3. Gelen paketi işle ve cevap hazırla
+                        self.process_request(conn, packet)
+                    except json.JSONDecodeError as e:
+                        print(f"[HATA] {addr} için JSON çözümleme hatası: {e} - Mesaj: {msg}")
 
             except Exception as e:
-                print(f"[HATA] {addr} hatası: {e}")
+                print(f"[HATA] {addr} bağlantı hatası: {e}")
                 break
 
         print(f"[AYRILDI] {addr} bağlantısı kesildi.")
-        self.clients.remove(conn)
+        
+        # Online kullanıcılardan temizle
+        user_to_remove = None
+        for username, socket in self.online_users.items():
+            if socket == conn:
+                user_to_remove = username
+                break
+        if user_to_remove:
+            del self.online_users[user_to_remove]
+            print(f"[SİSTEM] {user_to_remove} online listesinden çıkarıldı.")
+
+        if conn in self.clients:
+            self.clients.remove(conn)
         conn.close()
 
     def process_request(self, conn, packet):

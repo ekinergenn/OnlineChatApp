@@ -44,15 +44,32 @@ class Client:
     def listen_for_messages(self):
         """Sürekli olarak sunucudan mesaj bekler. 
         UYARI: Bu fonksiyon ana programı donduracağı için ayrı thread'de çağrılmalıdır!"""
+        buffer = ""
         while True:
             try:
                 data = self.receive_data()
                 if not data:
                     break
                 
-                self.message_handler.handle_incoming_data(data)
+                # Debug: Gelen veri tipini yazdır
+                # print(f"[DEBUG] Alınan veri tipi: {type(data)}")
                 
-            except Exception:
-                print("\n[SİSTEM] Sunucu bağlantısı koptu.")
+                try:
+                    if isinstance(data, bytes):
+                        decoded_chunk = data.decode('utf-8')
+                    else:
+                        decoded_chunk = data
+                except Exception as de:
+                    print(f"[HATA] Decode hatası: {de} | Veri: {data} | Tip: {type(data)}")
+                    continue
+                
+                buffer += decoded_chunk
+                while "<END>" in buffer:
+                    packet_str, buffer = buffer.split("<END>", 1)
+                    if packet_str:
+                        self.message_handler.handle_incoming_data(packet_str)
+                
+            except Exception as e:
+                print(f"\n[SİSTEM] Sunucu bağlantısı koptu: {e}")
                 self.client_socket.close()
                 break
