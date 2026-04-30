@@ -20,12 +20,15 @@ class ClickableFrame(QFrame):
 
 
 class MainPageUI(QWidget):
+    send_chatbot_message_signal = pyqtSignal(str)
+    reset_chatbot_signal = pyqtSignal()
     delete_chat_signal = pyqtSignal(str)
     block_user_signal = pyqtSignal(str)
     send_message_signal = pyqtSignal(str, str)
     load_history_signal = pyqtSignal(str)
     search_query_signal = pyqtSignal(str)
     start_chat_signal = pyqtSignal(str)
+
 
     def __init__(self):
         super().__init__()
@@ -163,6 +166,9 @@ class MainPageUI(QWidget):
         """)
         search_layout.addWidget(self.search_input)
         chat_layout.addWidget(search_frame)
+
+        self.chatbot_item = self.create_chatbot_item()
+        chat_layout.addWidget(self.chatbot_item)
 
         # --- Kaydırılabilir Sohbet Listesi ---
         scroll_area = QScrollArea()
@@ -777,6 +783,231 @@ class MainPageUI(QWidget):
                     if status_label:
                         status_label.setText("✓✓")
                         status_label.setStyleSheet("color: #3b82f6; font-size: 11px; font-weight: bold;")
+                break
+
+    def create_chatbot_item(self):
+        item_frame = ClickableFrame()
+        item_frame.contact_name = "__chatbot__"
+        item_frame.setFixedHeight(75)
+        item_frame.setCursor(QCursor(Qt.PointingHandCursor))
+        # ESKİ: mavi border ve açık mavi arka plan
+        # YENİ: daha soft, zarif görünüm
+        item_frame.setStyleSheet("""
+            QFrame { background-color: #f8f9fa; border-bottom: 1px solid #e9ecef; }
+            QFrame:hover { background-color: #f0f2f5; }
+        """)
+        item_frame.clicked.connect(self.switch_to_chatbot)
+
+        layout = QHBoxLayout(item_frame)
+        layout.setContentsMargins(15, 10, 15, 10)
+        layout.setSpacing(15)
+
+        avatar = QLabel("🤖")
+        avatar.setFixedSize(50, 50)
+        avatar.setAlignment(Qt.AlignCenter)
+        # ESKİ: düz mavi daire
+        # YENİ: gradient efektli mor-mavi
+        avatar.setStyleSheet("""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #667eea, stop:1 #764ba2);
+            border-radius: 25px;
+            font-size: 24px;
+        """)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(2)
+        text_layout.setAlignment(Qt.AlignVCenter)
+
+        name_label = QLabel("AI Asistan")
+        name_label.setStyleSheet("font-size: 15px; color: #111b21; font-weight: 700;")
+
+        sub_label = QLabel("✨ Gemini destekli")
+        sub_label.setStyleSheet("font-size: 12px; color: #667781;")
+
+        text_layout.addWidget(name_label)
+        text_layout.addWidget(sub_label)
+
+        layout.addWidget(avatar)
+        layout.addLayout(text_layout)
+        layout.addStretch()
+
+        return item_frame
+
+    def switch_to_chatbot(self):
+        """Chatbot ekranına geçer, yoksa oluşturur."""
+        # Daha önce oluşturulduysa bul ve göster
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == "__chatbot__":
+                self.chat_screens_stack.setCurrentIndex(i)
+                return
+
+        # İlk kez açılıyorsa oluştur
+        chatbot_screen = self.create_chatbot_screen()
+        self.chat_screens_stack.addWidget(chatbot_screen)
+        self.chat_screens_stack.setCurrentIndex(self.chat_screens_stack.count() - 1)
+
+    def create_chatbot_screen(self):
+        """Sağ tarafta açılacak chatbot sohbet ekranı."""
+        from PyQt5.QtWidgets import QSizePolicy
+
+        chat_frame = QFrame()
+        chat_frame.setStyleSheet("background-color: #efeae2;")
+        chat_frame.contact_name = "__chatbot__"
+
+        layout = QVBoxLayout(chat_frame)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # ── ÜST BAR ──────────────────────────────────────────
+        top_bar = QFrame()
+        top_bar.setFixedHeight(60)
+        top_bar.setStyleSheet("background-color: #f0f2f5; border-bottom: 1px solid #d1d7db;")
+        top_layout = QHBoxLayout(top_bar)
+        top_layout.setContentsMargins(10, 0, 10, 0)
+
+        avatar = QLabel("🤖")
+        avatar.setFixedSize(40, 40)
+        avatar.setStyleSheet("background-color: #3b82f6; border-radius: 20px; font-size: 20px;")
+        avatar.setAlignment(Qt.AlignCenter)
+
+        name_label = QLabel("AI Asistan")
+        name_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #111b21;")
+
+        sub_label = QLabel("Gemini 1.5 Flash")
+        sub_label.setStyleSheet("font-size: 12px; color: #667781;")
+
+        name_layout = QVBoxLayout()
+        name_layout.setSpacing(0)
+        name_layout.addWidget(name_label)
+        name_layout.addWidget(sub_label)
+
+        reset_btn = QPushButton("🔄")
+        reset_btn.setFixedSize(35, 35)
+        reset_btn.setToolTip("Sohbeti Sıfırla")
+        reset_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        reset_btn.setStyleSheet("""
+            QPushButton { border: none; font-size: 18px; border-radius: 17px; background-color: transparent; }
+            QPushButton:hover { background-color: #e4e6eb; }
+        """)
+        reset_btn.clicked.connect(self.reset_chatbot_conversation)
+
+        top_layout.addWidget(avatar)
+        top_layout.addSpacing(8)
+        top_layout.addLayout(name_layout)
+        top_layout.addStretch()
+        top_layout.addWidget(reset_btn)
+
+        # ── MESAJ ALANI ──────────────────────────────────────
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
+
+        msg_container = QWidget()
+        msg_container.setStyleSheet("background-color: #efeae2;")
+
+        msg_layout = QVBoxLayout(msg_container)
+        msg_layout.setContentsMargins(10, 10, 10, 10)
+        msg_layout.setSpacing(6)
+        msg_layout.addStretch()
+
+        scroll.setWidget(msg_container)
+
+        chat_frame.msg_layout = msg_layout
+        chat_frame.scroll = scroll
+        chat_frame.typing_bubble = None  # "Yazıyor..." balonunu takip etmek için
+
+        # ── ALT BAR ──────────────────────────────────────────
+        bottom_bar = QFrame()
+        bottom_bar.setFixedHeight(60)
+        bottom_bar.setStyleSheet("background-color: #f0f2f5;")
+        bottom_layout = QHBoxLayout(bottom_bar)
+        bottom_layout.setContentsMargins(10, 10, 10, 10)
+
+        msg_input = QLineEdit()
+        msg_input.setPlaceholderText("AI Asistana bir şey sorun...")
+        msg_input.setStyleSheet("""
+            background-color: #ffffff; border: none;
+            border-radius: 8px; padding: 10px; font-size: 14px;
+        """)
+
+        send_btn = QPushButton("➤")
+        send_btn.setFixedSize(40, 40)
+        send_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        send_btn.setStyleSheet("font-size: 20px; border: none; color: #3b82f6; background: transparent;")
+
+        def on_send():
+            text = msg_input.text().strip()
+            if text:
+                self.send_chatbot_message_signal.emit(text)
+                msg_input.clear()
+
+        send_btn.clicked.connect(on_send)
+        msg_input.returnPressed.connect(on_send)
+
+        bottom_layout.addWidget(msg_input)
+        bottom_layout.addWidget(send_btn)
+
+        layout.addWidget(top_bar)
+        layout.addWidget(scroll)
+        layout.addWidget(bottom_bar)
+
+        return chat_frame
+
+    def add_chatbot_message_to_ui(self, content: str, is_mine: bool, is_typing: bool = False):
+        """Chatbot ekranına mesaj balonu ekler."""
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == "__chatbot__":
+                msg_layout = widget.msg_layout
+                scroll = widget.scroll
+
+                msg_layout.takeAt(msg_layout.count() - 1)  # stretch'i kaldır
+                bubble, _ = self._create_message_bubble(
+                    content, is_mine,
+                    status="read",
+                    read_by=["bot"] if is_mine else [],
+                    timestamp=None
+                )
+
+                msg_layout.addWidget(bubble)
+
+                if is_typing:
+                    widget.typing_bubble = bubble  # referansı sakla
+
+                msg_layout.addStretch()
+
+                QApplication.processEvents()
+                scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
+                break
+
+    def remove_chatbot_typing_indicator(self):
+        """'Yazıyor...' balonunu kaldırır."""
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == "__chatbot__":
+                if widget.typing_bubble:
+                    widget.msg_layout.removeWidget(widget.typing_bubble)
+                    widget.typing_bubble.deleteLater()
+                    widget.typing_bubble = None
+                break
+
+    def reset_chatbot_conversation(self):
+        """🔄 butonuna basınca sohbet geçmişini temizler."""
+        # Sinyal yoluyla servise ulaşmak yerine direkt controller üzerinden çağrılır
+        # Bu yüzden bu sinyali de tanımlıyoruz:
+        self.reset_chatbot_signal.emit()
+
+        # UI'daki mesajları temizle
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == "__chatbot__":
+                msg_layout = widget.msg_layout
+                # Stretch hariç tüm widget'ları sil
+                while msg_layout.count() > 1:
+                    item = msg_layout.takeAt(0)
+                    if item.widget():
+                        item.widget().deleteLater()
                 break
 
 

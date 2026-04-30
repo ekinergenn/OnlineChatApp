@@ -10,6 +10,8 @@ from services.message_service import MessageService
 from controllers import LogRegController
 from controllers.chat_controller import ChatController
 from controllers.message_controller import MessageController
+from services.chatbot_service import ChatbotService
+from controllers.chatbot_controller import ChatbotController
 
 class MainApplicationWindow(QMainWindow):
     def __init__(self):
@@ -34,6 +36,8 @@ class MainApplicationWindow(QMainWindow):
         self.chat_client = Client(services={})
 
         # 4. Servisler
+        GEMINI_API_KEY = "AIzaSyA8VFHD0EcCU98ywUya6uI7LyN82Qd8OJg"
+        self.chatbot_service = ChatbotService(GEMINI_API_KEY)
         self.chat_service = ChatService(self.chat_client)
         self.message_service = MessageService(self.chat_client)
         self.logreg_service = LogRegService(self.chat_client, chat_service=self.chat_service)
@@ -57,6 +61,7 @@ class MainApplicationWindow(QMainWindow):
         )
         self.message_controller = MessageController(self.main_page, self.message_service)
         self.chat_controller = ChatController(self.main_page, self.chat_service, self.message_controller, self.block_service)
+        self.chatbot_controller = ChatbotController(self.main_page, self.chatbot_service)
 
         # 7. Bağlan ve dinle
         if self.chat_client.connect():
