@@ -435,7 +435,7 @@ class MainPageUI(QWidget):
             self.send_message_signal.emit(chat_name, text)
             input_field.clear()  # Gönderdikten sonra kutuyu temizle
 
-    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None):
+    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None, timestamp=None):
         if read_by is None:
             read_by = []
 
@@ -447,7 +447,7 @@ class MainPageUI(QWidget):
 
                 stretch_item = msg_layout.takeAt(msg_layout.count() - 1)
 
-                bubble, status_label = self._create_message_bubble(content, is_mine, status, read_by)
+                bubble, status_label = self._create_message_bubble(content, is_mine, status, read_by, timestamp)
                 msg_layout.addWidget(bubble)
 
                 msg_layout.addStretch()
@@ -463,82 +463,144 @@ class MainPageUI(QWidget):
 
         self.update_chat_last_message(chat_name, content, is_mine)
 
-    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None):
-        # ── YENİ: read_by parametresi eklendi (eskiden yoktu)
+    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None, timestamp=None):
         if read_by is None:
             read_by = []
 
+        import datetime
+
+        time_str = ""
+        if timestamp:
+            try:
+                dt = datetime.datetime.fromtimestamp(float(timestamp))
+                time_str = dt.strftime("%H:%M")
+            except (ValueError, OSError, OverflowError, TypeError):
+                time_str = ""
+
         wrapper = QWidget()
         wrapper.setStyleSheet("background: transparent;")
+
         w_layout = QHBoxLayout(wrapper)
-        w_layout.setContentsMargins(0, 0, 0, 0)
+        w_layout.setContentsMargins(8, 3, 8, 3)
         w_layout.setSpacing(0)
 
-        bubble_container = QWidget()
-        bubble_container.setStyleSheet("background: transparent;")
-        b_layout = QVBoxLayout(bubble_container)
-        b_layout.setContentsMargins(0, 0, 0, 0)
-        b_layout.setSpacing(2)
+        bubble_frame = QFrame()
+        bubble_frame.setMinimumWidth(60)
+        bubble_frame.setMaximumWidth(420)
+        bubble_frame.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
 
-        bubble = QLabel(content)
-        bubble.setWordWrap(True)
-        bubble.setMaximumWidth(400)
-        bubble.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        bubble_layout = QVBoxLayout(bubble_frame)
+        bubble_layout.setContentsMargins(10, 6, 10, 5)
+        bubble_layout.setSpacing(3)
 
-        # ── YENİ: status_label değişkeni tanımlandı (None olarak başlıyor)
-        # eskiden yoktu, direkt status_label = QLabel() yapılıyordu
+        text_label = QLabel(content)
+        text_label.setWordWrap(True)
+        text_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        text_label.setStyleSheet("""
+            QLabel {
+                background: transparent;
+                color: #111b21;
+                font-size: 14px;
+                padding: 0px;
+            }
+        """)
+        text_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        text_label.setMinimumHeight(0)
+
+        time_label = QLabel(time_str)
+        time_label.setStyleSheet("""
+            QLabel {
+                background: transparent;
+                color: #667781;
+                font-size: 11px;
+                padding: 0px;
+            }
+        """)
+        time_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
         status_label = None
 
         if is_mine:
-            bubble.setStyleSheet("""
-                background-color: #dcf8c6; color: #111b21;
-                border-radius: 8px; padding: 8px 12px; font-size: 14px;
+            bubble_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #dcf8c6;
+                    border-radius: 8px;
+                }
             """)
 
-            # ── YENİ: Tik kararı artık read_by'a bakıyor
-            # eskiden sadece status string'ine bakılıyordu (sent/delivered/read)
             others_read = [u for u in read_by if u]
 
-            if len(others_read) >= 2:
-                # Gönderen + en az 1 alıcı okumuş → mavi çift tik
+            if len(others_read) >= 1 or status == "read":
                 tick_text = "✓✓"
-                tick_style = "color: #3b82f6; font-size: 11px; font-weight: bold;"
-            elif len(others_read) == 1:
-                # Sadece gönderen var → gri çift tik (iletildi)
-                tick_text = "✓✓"
-                tick_style = "color: #667781; font-size: 11px;"
+                tick_color = "#3b82f6"
+                tick_weight = "bold"
             else:
-                # read_by boş → eski status mantığına düş
-                if status == "sent":
-                    tick_text = "✓"
-                    tick_style = "color: #667781; font-size: 11px;"
-                elif status == "read":
-                    tick_text = "✓✓"
-                    tick_style = "color: #3b82f6; font-size: 11px; font-weight: bold;"
-                else:  # delivered
-                    tick_text = "✓✓"
-                    tick_style = "color: #667781; font-size: 11px;"
+                tick_text = "✓✓"
+                tick_color = "#667781"
+                tick_weight = "normal"
 
             status_label = QLabel(tick_text)
-            status_label.setStyleSheet(tick_style)
-            status_label.setAlignment(Qt.AlignRight)
-
-            b_layout.addWidget(bubble)
-            b_layout.addWidget(status_label)
-
-            w_layout.addStretch()
-            w_layout.addWidget(bubble_container)
-        else:
-            bubble.setStyleSheet("""
-                background-color: #ffffff; color: #111b21;
-                border-radius: 8px; padding: 8px 12px; font-size: 14px;
+            status_label.setStyleSheet(f"""
+                QLabel {{
+                    background: transparent;
+                    color: {tick_color};
+                    font-size: 11px;
+                    font-weight: {tick_weight};
+                    padding: 0px;
+                }}
             """)
-            b_layout.addWidget(bubble)
+            status_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
-            w_layout.addWidget(bubble_container)
+        else:
+            bubble_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #ffffff;
+                    border-radius: 8px;
+                }
+            """)
+
+        fm = text_label.fontMetrics()
+        text_width = fm.horizontalAdvance(content)
+
+        max_text_width = 330
+
+        if text_width > max_text_width:
+            text_label.setFixedWidth(max_text_width)
+            bubble_frame.setFixedWidth(360)
+        else:
+            extra_width = 75 if is_mine else 55
+            bubble_width = text_width + extra_width + 20
+
+            if bubble_width < 70:
+                bubble_width = 70
+
+            if bubble_width > 360:
+                bubble_width = 360
+
+            text_label.setMaximumWidth(bubble_width - 20)
+            bubble_frame.setFixedWidth(bubble_width)
+
+        bubble_layout.addWidget(text_label)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.setSpacing(3)
+
+        bottom_row.addStretch()
+        bottom_row.addWidget(time_label)
+
+        if is_mine and status_label is not None:
+            bottom_row.addWidget(status_label)
+
+        bubble_layout.addLayout(bottom_row)
+
+        if is_mine:
+            w_layout.addStretch()
+            w_layout.addWidget(bubble_frame)
+        else:
+            w_layout.addWidget(bubble_frame)
             w_layout.addStretch()
 
-        # ── YENİ: Tuple olarak dönüyor (eskiden sadece wrapper dönüyordu)
         return wrapper, status_label
 
     def create_chat_screens_stack(self):

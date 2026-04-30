@@ -61,31 +61,43 @@ class MessageController():
         message_id = payload.get("message_id")
 
         is_mine = (sender == self.current_username)
-        
+
         chat_name = chat_id
         target_widget = None
+
+        # 1. Önce Chat ID'ye göre sohbeti arayüzde bulmaya çalış
         for i in range(self.main_page.chat_screens_stack.count()):
             widget = self.main_page.chat_screens_stack.widget(i)
             if getattr(widget, 'current_chat_id', None) == chat_id:
                 chat_name = getattr(widget, 'contact_name', chat_id)
                 target_widget = widget
                 break
-                
-        # Eğer bu sohbet arayüzde yoksa (örneğin ilk defa mesaj alıyorsak)
-        if target_widget is None and not is_mine:
-            chat_name = sender  # 1'e 1 sohbette gönderen kişinin adını sohbet adı yap
-            
-            # Belki sadece chat_id'si atanmamış bir sekme vardır, onu kontrol et
+
+        # 2. Eğer Chat ID ile bulamadıysak (Yani sohbet arayüzde ID olarak henüz tanımlı değilse)
+        if target_widget is None:
+            # İsim belirleme
+            if not is_mine:
+                chat_name = sender  # Karşı taraf attıysa, isim onun adıdır.
+            else:
+                # Biz attıysak ama ID eşleşmediyse (Yeni sohbet):
+                # Ya backend'den gelen target_username'i çekeriz, ya da şu an açık olan aktif sekmedeki ismi alırız.
+                chat_name = payload.get("target_username")
+                if not chat_name:
+                    active_w = self.main_page.chat_screens_stack.currentWidget()
+                    if hasattr(active_w, 'contact_name'):
+                        chat_name = active_w.contact_name
+
+            # Belirlediğimiz isimle arayüzdeki sohbeti isim üzerinden tekrar arayalım
             for i in range(self.main_page.chat_screens_stack.count()):
                 w = self.main_page.chat_screens_stack.widget(i)
                 if hasattr(w, 'contact_name') and w.contact_name == chat_name:
                     target_widget = w
-                    target_widget.current_chat_id = chat_id
+                    target_widget.current_chat_id = chat_id  # ID'yi ilk defa burada eşleştiriyoruz
                     if not hasattr(target_widget, 'messages_data'):
                         target_widget.messages_data = []
                     break
-                    
-            # Gerçekten hiç yoksa yeni sohbet oluştur
+
+            # 3. Hala bulamadıysak (Gerçekten ilk defa mesajlaşıyorsak ve sekme hiç yoksa)
             if target_widget is None:
                 self.main_page.add_new_chat_to_ui(chat_name)
                 for i in range(self.main_page.chat_screens_stack.count()):
@@ -95,23 +107,30 @@ class MessageController():
                         w.messages_data = []
                         target_widget = w
                         break
-                        
-        self.main_page.add_message_to_ui(chat_name, content, is_mine, status, read_by=payload.get("read_by", []),
-    message_id=message_id)
-        
+
+        # 4. Kendi adımızı read_by listesinden çıkaralım (Mavi tik hatasını önlemek için)
+        actual_read_by = [u for u in payload.get("read_by", []) if u != self.current_username]
+
+        # 5. Mesajı arayüze ekle
+        self.main_page.add_message_to_ui(chat_name, content, is_mine, status, read_by=actual_read_by,
+                                         message_id=message_id, timestamp=payload.get("timestamp"))
+
+        # 6. Okunmamış mesaj sayısı ve "Görüldü" gönderme işlemleri (Sadece karşıdan gelen mesajlar için)
         if not is_mine:
-            # Check if chat is currently active
+            # Chat şu an aktif ekranda mı kontrol et
             current_index = self.main_page.main_stack.currentIndex()
             is_active = False
-            
+
             if current_index == 0:
                 active_widget = self.main_page.chat_screens_stack.currentWidget()
                 if getattr(active_widget, 'current_chat_id', None) == chat_id:
                     is_active = True
-            
+
             if is_active and message_id:
+                # Ekrandaysa anında okundu bilgisi gönder
                 self.message_service.send_mark_as_read(chat_id, [message_id], self.current_username)
             else:
+                # Ekranda değilse sol paneldeki okunmamış sayısını arttır
                 for i in range(self.main_page.scroll_layout.count()):
                     item = self.main_page.scroll_layout.itemAt(i)
                     if item and item.widget():
@@ -120,6 +139,7 @@ class MessageController():
                             current_count = getattr(w, 'unread_count', 0)
                             self.main_page.update_chat_unread_count(chat_name, current_count + 1)
                             break
+
                 if target_widget and message_id:
                     if not hasattr(target_widget, 'unread_message_ids'):
                         target_widget.unread_message_ids = []
@@ -137,11 +157,17 @@ class MessageController():
         for message in messages:
             sender = message.get("sender")
             is_mine = (sender == self.current_username)
-            
+
             if not is_mine and self.current_username not in message.get("read_by", []):
                 unread_count += 1
-            
-            self.main_page.add_message_to_ui(chat_name, message.get("content"), is_mine, message.get("status", "read"), read_by=message.get("read_by", []))
+
+            # Kendi adımızı read_by listesinden çıkarıyoruz
+            actual_read_by = [u for u in message.get("read_by", []) if u != self.current_username]
+
+            # Varsayılan durumu "read" yerine "delivered" yapıyoruz
+            self.main_page.add_message_to_ui(chat_name, message.get("content"), is_mine,
+                                             message.get("status", "delivered"), read_by=actual_read_by,
+                                             timestamp=message.get("timestamp"))
         
         self.main_page.update_chat_unread_count(chat_name, unread_count)
 

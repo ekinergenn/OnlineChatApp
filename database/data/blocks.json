@@ -8,7 +8,7 @@
     {
       "blocker_id": "1",
       "blocked_id": "3",
-      "isBlocked": true,
+      "isBlocked": false,
       "timestamp": 1777494529.4293065
     },
     {
