@@ -77,7 +77,7 @@ def delete_user(username):
     return False
 
 def update_user_info(username, fullname, email, tel):
-    users = get_all_users()
+    users = read_json(FILENAME)
     updated = False
 
     for user in users:
@@ -92,8 +92,7 @@ def update_user_info(username, fullname, email, tel):
         from database.db import write_json
         import os
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        file_path = os.path.join(base_dir, "database","data", "users.json")
 
-        write_json(file_path, users)
+        write_json(FILENAME, users)
         return True
     return False
