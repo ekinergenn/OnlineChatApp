@@ -11,19 +11,23 @@ class MessageService(QObject):
         super().__init__()
         self.client = client
 
-    def send_chat_message(self, chat_id: str, content: str, sender_id: int, sender: str = ""):
+    def send_chat_message(self, chat_id: str, content: str, sender_id: int, sender: str = "", encrypted_data: dict = None):
+        payload = {
+            "message_id": uuid.uuid4().hex,
+            "chat_id": chat_id,
+            "content": content,
+            "sender_id": sender_id,
+            "sender": sender,
+            "timestamp": int(time.time()),
+            "status": "sent",
+            "read_by": [sender]
+        }
+        if encrypted_data:
+            payload["encrypted_data"] = encrypted_data
+
         packet = {
             "type": "chat_message",
-            "payload": {
-                "message_id": uuid.uuid4().hex,
-                "chat_id": chat_id,
-                "content": content,
-                "sender_id": sender_id,
-                "sender": sender,
-                "timestamp": int(time.time()),
-                "status": "sent",
-                "read_by": [sender]
-            }
+            "payload": payload
         }
         self.client.send_data(packet)
 

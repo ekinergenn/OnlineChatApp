@@ -368,6 +368,7 @@ class MainPageUI(QWidget):
         chat_frame.scroll = scroll
 
         chat_frame.message_status_labels = {}
+        chat_frame.displayed_message_ids = set()  # Duplicate mesajı önlemek için
 
         # ── YAZMA GÖSTERGESİ ALANI (YENİ) ───────────────────────────────────
         self._typing_label_frame = None  # her frame için ayrı referans aşağıda atanıyor
@@ -572,6 +573,10 @@ class MainPageUI(QWidget):
         for i in range(self.chat_screens_stack.count()):
             widget = self.chat_screens_stack.widget(i)
             if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                # Duplicate mesaj kontrolü
+                if message_id and message_id in getattr(widget, 'displayed_message_ids', set()):
+                    break  # Zaten eklendi, tekrar ekleme
+
                 msg_layout = widget.msg_layout
                 scroll = widget.scroll
 
@@ -581,6 +586,9 @@ class MainPageUI(QWidget):
                 msg_layout.addWidget(bubble)
 
                 msg_layout.addStretch()
+
+                if message_id:
+                    widget.displayed_message_ids.add(message_id)
 
                 if is_mine and message_id and status_label:
                     widget.message_status_labels[message_id] = status_label

@@ -41,9 +41,11 @@ class ChatController():
             if getattr(widget, 'contact_name', None) == chat_name:
                 is_group = getattr(widget, 'is_group', False)
                 if not is_group and chat_name != "__chatbot__":
-                    # Kısa gecikme ile sor — widget tam oturmuş olsun
                     from PyQt5.QtCore import QTimer
                     QTimer.singleShot(100, lambda u=chat_name: self.chat_service.send_get_user_status_request(u))
+                    # E2EE: Anahtarı her sohbet açılışında tazele
+                    if hasattr(self.message_controller, 'encryption_service') and self.message_controller.encryption_service:
+                        QTimer.singleShot(200, lambda u=chat_name: self.message_controller.encryption_service.send_get_public_key_request(u))
                 break
 
     def set_current_user(self, profile: dict):
@@ -111,16 +113,17 @@ class ChatController():
 
     def load_user_chats(self, chats: list):
         for chat in chats:
-            chat_id = chat.get("chat_id")
-            chat_name = chat.get("chat_name", chat_id)
+            chat_id    = chat.get("chat_id")
+            chat_name  = chat.get("chat_name", chat_id)
+            messages   = chat.get("messages", [])
             other_user_id = chat.get("other_user_id")
-            block_status = chat.get("block_status", "none")
-            is_group = chat.get("is_group", False)
-            
-            # Add chat to UI
+            block_status  = chat.get("block_status", "none")
+            is_group      = chat.get("is_group", False)
+
+            # Arayüze sohbet kartını ekle
             self.main_page.add_new_chat_to_ui(chat_name, is_group=is_group)
-            
-            # Widget'a ID ve block bilgisini göm
+
+            # Widget'ı bul ve meta verilerini göm
             for i in range(self.main_page.chat_screens_stack.count()):
                 widget = self.main_page.chat_screens_stack.widget(i)
                 if getattr(widget, 'contact_name', None) == chat_name:
@@ -132,14 +135,13 @@ class ChatController():
                         widget.block_action.setText("🚫 Kişiyi Engelle")
                     break
 
-                for chat in chats:
-                    if not chat.get("is_group", False):
-                        chat_name = chat.get("chat_name")
-                        if chat_name:
-                            self.chat_service.send_get_user_status_request(chat_name)
+            # 1-1 sohbetlerde kullanıcı durumunu sor (sadece bir kez, dışarıda)
+            if not is_group:
+                self.chat_service.send_get_user_status_request(chat_name)
 
-            # Yükleme işlemi message_controller'a devrediliyor
-            self.message_controller.load_historical_messages(chat_name, chat_id, chat.get("messages", []))
+            # Geçmiş mesajları yükle — chat_name/chat_id değişkenleri üstteki
+            # 'for chat in chats' döngüsünden alınıyor, kesinlikle doğru değerler.
+            self.message_controller.load_historical_messages(chat_name, chat_id, messages)
             self.loaded_chats.add(chat_id)
 
     def handle_search(self, query: str):

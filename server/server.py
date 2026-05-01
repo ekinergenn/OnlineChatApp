@@ -3,7 +3,7 @@ import threading
 import json
 import time
 import os
-from database.user_repository import find_user, create_user, search_users, delete_user
+from database.user_repository import find_user, create_user, search_users, delete_user, update_public_key, get_public_key
 from database.message_repository import save_message, get_messages, mark_messages_as_read
 from database.chat_repository import create_chat, get_all_chats, get_chat_, get_user_chats, delete_chat
 from database import block_repository
@@ -112,8 +112,14 @@ class ChatServer:
 
             user=find_user(username)
             if user and user["password"] == password:
+                # KRİTİK: Aynı soket önceki oturumlarda başka kullanıcılara atanmış olabilir.
+                # Önce bu sokete bağlı tüm eski kullanıcıları temizle.
+                stale = [u for u, s in list(self.online_users.items()) if s == conn and u != user["username"]]
+                for stale_user in stale:
+                    del self.online_users[stale_user]
+                    print(f"[SİSTEM] Stale kullanıcı temizlendi: {stale_user}")
+
                 self.online_users[user["username"]] = conn
-                print(self.online_users)
                 self._broadcast_status(user["username"], "online")
                 response = {
                     "type": "login_response",
@@ -550,6 +556,12 @@ class ChatServer:
             }
             self.send_packet(conn, response)
 
+        elif msg_type == "update_public_key_request":
+            self.handle_update_public_key_request(conn, packet.get("payload", {}))
+
+        elif msg_type == "get_public_key_request":
+            self.handle_get_public_key_request(conn, packet.get("payload", {}))
+
         # elif msg_type == "create_chat_request":
         #     payload = packet.get("payload", {})
         #     members = payload.get("members", []) # [gönderen, alıcı]
@@ -579,5 +591,39 @@ class ChatServer:
 
     def send_packet(self, conn, packet_dict):
         """Senin Protocol.py yapına uygun şekilde gönderim yapar."""
-        json_data = json.dumps(packet_dict) + "<END>"
-        conn.sendall(json_data.encode('utf-8'))
+        try:
+            json_data = json.dumps(packet_dict) + "<END>"
+            conn.sendall(json_data.encode('utf-8'))
+        except Exception as e:
+            print(f"[AĞ HATASI] Paket gönderilemedi (bağlantı kesilmiş olabilir): {e}")
+
+    def handle_update_public_key_request(self, conn, payload: dict):
+        """Kullanıcının genel anahtarını sunucu veritabanına kaydeder."""
+        username = payload.get("username")
+        public_key = payload.get("public_key")
+        if username and public_key:
+            success = update_public_key(username, public_key)
+            print(f"[E2EE] {username} için genel anahtar {'kaydedildi' if success else 'kaydedilemedi'}.")
+
+    def handle_get_public_key_request(self, conn, payload: dict):
+        """Bir kullanıcının sunucuda kayıtlı genel anahtarını döndürür."""
+        username = payload.get("username")
+        public_key = get_public_key(username) if username else None
+        if public_key:
+            self.send_packet(conn, {
+                "type": "get_public_key_response",
+                "payload": {
+                    "status": "success",
+                    "username": username,
+                    "public_key": public_key
+                }
+            })
+        else:
+            self.send_packet(conn, {
+                "type": "get_public_key_response",
+                "payload": {
+                    "status": "not_found",
+                    "username": username,
+                    "message": "Genel anahtar bulunamadı."
+                }
+            })

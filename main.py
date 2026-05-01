@@ -7,17 +7,20 @@ from ui import LoginPageUI, RegisterPageUI, MainPageUI
 from services import LogRegService
 from services.chat_service import ChatService
 from services.message_service import MessageService
+from services.encryption_service import EncryptionService
 from controllers import LogRegController
 from controllers.chat_controller import ChatController
 from controllers.message_controller import MessageController
 from services.chatbot_service import ChatbotService
 from controllers.chatbot_controller import ChatbotController
 
+
 class MainApplicationWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OnlineChat Uygulaması")
         self.setStyleSheet("QMainWindow { background-color: #f0f2f5; }")
+        self.current_user = None
 
         # 1. Ana widget
         self.stacked_widget = QStackedWidget()
@@ -28,9 +31,9 @@ class MainApplicationWindow(QMainWindow):
         self.register_page = RegisterPageUI()
         self.main_page = MainPageUI()
 
-        self.stacked_widget.addWidget(self.login_page)   # index 0
-        self.stacked_widget.addWidget(self.register_page) # index 1
-        self.stacked_widget.addWidget(self.main_page)     # index 2
+        self.stacked_widget.addWidget(self.login_page)    # index 0
+        self.stacked_widget.addWidget(self.register_page)  # index 1
+        self.stacked_widget.addWidget(self.main_page)      # index 2
 
         # 3. Network
         self.chat_client = Client(services={})
@@ -42,13 +45,15 @@ class MainApplicationWindow(QMainWindow):
         self.message_service = MessageService(self.chat_client)
         self.logreg_service = LogRegService(self.chat_client, chat_service=self.chat_service)
         self.block_service = BlockService(self.chat_client)
+        self.encryption_service = EncryptionService(self.chat_client, keys_dir="keys")
 
-        # 5. Servisleri client'a tanıt (tek seferde)
+        # 5. Servisleri client'a tanıt
         self.chat_client.register_services({
             'logreg_service': self.logreg_service,
             'chat_service': self.chat_service,
             'message_service': self.message_service,
-            'block_service': self.block_service
+            'block_service': self.block_service,
+            'encryption_service': self.encryption_service
         })
 
         # 6. Controller'lar
@@ -59,8 +64,18 @@ class MainApplicationWindow(QMainWindow):
             self.logreg_service,
             on_login_success=self.on_login_success
         )
-        self.message_controller = MessageController(self.main_page, self.message_service)
-        self.chat_controller = ChatController(self.main_page, self.chat_service, self.message_controller, self.block_service,self.chatbot_service)
+        self.message_controller = MessageController(
+            self.main_page,
+            self.message_service,
+            self.encryption_service
+        )
+        self.chat_controller = ChatController(
+            self.main_page,
+            self.chat_service,
+            self.message_controller,
+            self.block_service,
+            self.chatbot_service
+        )
         self.chatbot_controller = ChatbotController(self.main_page, self.chatbot_service)
 
         # 7. Bağlan ve dinle
@@ -71,12 +86,11 @@ class MainApplicationWindow(QMainWindow):
             self.listen_thread.daemon = True
             self.listen_thread.start()
 
-        # logout sinyali
+        # Çıkış sinyalleri
         self.main_page.profile_page.logout_signal.connect(self.handle_logout)
         self.logreg_service.logout_requested_signal.connect(self.handle_logout)
 
     def handle_logout(self):
-        # onaykutusu
         reply = QMessageBox.question(
             self, 'Oturumu Kapat',
             "Oturumu kapatmak istediğinize emin misiniz?",
@@ -84,29 +98,32 @@ class MainApplicationWindow(QMainWindow):
         )
 
         if reply == QMessageBox.Yes:
-            #Login sayfasına dön indeks 0
-            self.stacked_widget.setCurrentIndex(0)
             self.login_page.clear_fields()
             self.main_page.reset_ui()
             self.chat_controller.reset_user_data()
+            self.message_controller.reset_user_data()
+            self.encryption_service.reset()  # Anahtarları ve önbelleği temizle
             self.stacked_widget.setCurrentIndex(0)
-
-            #kullanıcı verisini temizle
             self.current_user = None
 
     def on_login_success(self, user_info: dict):
         """Login başarılı olunca çağrılır."""
         self.current_user = user_info  # {"user_id": 1, "username": "nisa", ...}
+        username = user_info.get("username", "")
 
-        self.main_page.reset_ui()  # Giriş anında da temiz bir UI ile başlamak iyidir
+        self.main_page.reset_ui()
+
+        # E2EE: RSA anahtar çiftini oluştur/yükle ve sunucuya genel anahtarı gönder
+        public_key_pem = self.encryption_service.generate_key_pair(username)
+        if public_key_pem:
+            self.encryption_service.send_update_public_key_request(username)
+
         self.chat_controller.set_current_user(user_info)
         self.message_controller.set_current_user(user_info)
 
-        # Ana pencerede MainPage'in olduğu indeks 2 göster
         self.stacked_widget.setCurrentIndex(2)
-
-        # MainPage içindeki sekmeyi Sohbetler 0 yap
         self.main_page.main_stack.setCurrentIndex(0)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

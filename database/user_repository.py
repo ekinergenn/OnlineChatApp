@@ -96,3 +96,22 @@ def update_user_info(username, fullname, email, tel):
         write_json(FILENAME, users)
         return True
     return False
+
+
+def update_public_key(username: str, public_key_pem: str) -> bool:
+    """Kullanıcının genel RSA anahtarını JSON dosyasına kaydeder."""
+    users = read_json(FILENAME)
+    for user in users:
+        if user.get("username") == username:
+            user["public_key"] = public_key_pem
+            write_json(FILENAME, users)
+            return True
+    return False
+
+
+def get_public_key(username: str) -> str | None:
+    """Kullanıcının genel RSA anahtarını JSON dosyasından okur."""
+    user = find_user(username)
+    if user:
+        return user.get("public_key")
+    return None

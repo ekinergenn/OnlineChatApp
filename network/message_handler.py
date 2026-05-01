@@ -65,5 +65,9 @@ class MessageHandler:
         elif msg_type == "create_group_response":
             self.services['chat_service'].handle_create_group_response(payload)
 
+        elif msg_type == "get_public_key_response":
+            if 'encryption_service' in self.services:
+                self.services['encryption_service'].handle_get_public_key_response(payload)
+
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")
