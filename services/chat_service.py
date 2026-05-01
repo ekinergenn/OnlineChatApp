@@ -8,6 +8,7 @@ class ChatService(QObject):
     create_chat_response_signal = pyqtSignal(dict) # Sadece tekli sohbet için
     all_users_loaded_signal = pyqtSignal(list)
     create_group_response_signal = pyqtSignal(dict)
+    user_status_signal = pyqtSignal(dict)
 
     def __init__(self, client):
         super().__init__()
@@ -96,3 +97,19 @@ class ChatService(QObject):
         #servis içindeki sadece kullanıcıya özel geçici verileri sıfırlar
         self._pending_delete_chat_name = None
         print("[SERVICE] ChatService verileri temizlendi, bağlantı (client) korunuyor.")
+
+    def send_get_user_status_request(self, username: str):
+        """Belirli bir kullanıcının online/offline durumunu sorgular."""
+        packet = {
+            "type": "get_user_status_request",
+            "payload": {"username": username}
+        }
+        self.client.send_data(packet)
+
+    def handle_user_status_response(self, payload: dict):
+        """Durum sorgu cevabını UI'a iletir."""
+        self.user_status_signal.emit(payload)
+
+    def handle_user_status_update(self, payload: dict):
+        """Sunucudan gelen anlık durum değişikliğini UI'a iletir."""
+        self.user_status_signal.emit(payload)

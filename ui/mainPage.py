@@ -1,10 +1,11 @@
+import datetime
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QHBoxLayout, QFrame, QScrollArea, QSizePolicy, QStackedWidget,
     QMenu, QAction, QMessageBox
 )
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QCursor
 from ui.communitiesPage import CommunitiesPageUI
 from ui.settingsPage import SettingsPageUI
@@ -30,10 +31,11 @@ class MainPageUI(QWidget):
     start_chat_signal = pyqtSignal(str)
     create_group_signal = pyqtSignal(str, list)  # (group_name, [members])
     request_all_users_signal = pyqtSignal()  # + butonuna basınca sunucudan kullanıcı listesi iste
-
+    typing_signal = pyqtSignal(str, bool)  # ← YENİ: (chat_name, is_typing)
 
     def __init__(self):
         super().__init__()
+        self._typing_timers = {}
         self.init_ui()
 
     def init_ui(self):
@@ -63,7 +65,6 @@ class MainPageUI(QWidget):
 
         # Sayfa 2: Topluluklar Sayfası (Örnek Boş Sayfa) index 1
         self.communities_page = CommunitiesPageUI(self)
-        
         self.main_stack.addWidget(self.communities_page)
 
         #sayfa 3: ayarlar index 2
@@ -292,8 +293,23 @@ class MainPageUI(QWidget):
         avatar.setStyleSheet("background-color: #dfe5e7; border-radius: 20px; font-size: 20px;")
         avatar.setAlignment(Qt.AlignCenter)
 
+        name_col = QVBoxLayout()
+        name_col.setSpacing(1)
+        name_col.setContentsMargins(0, 0, 0, 0)
+
         name_label = QLabel(contact_name)
         name_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #111b21;")
+
+        # Durum etiketi — grup değilse göster
+        status_label = QLabel("")
+        status_label.setStyleSheet("font-size: 11px; color: #667781;")
+        status_label.setVisible(not is_group)
+
+        name_col.addWidget(name_label)
+        name_col.addWidget(status_label)
+
+        # Frame'e referans göm (sonradan güncellemek için)
+        chat_frame.status_label = status_label
 
         delete_btn = QPushButton("🗑️")
         delete_btn.setFixedSize(35, 35)
@@ -326,7 +342,8 @@ class MainPageUI(QWidget):
         options_btn.setMenu(menu)
 
         top_layout.addWidget(avatar)
-        top_layout.addWidget(name_label)
+        top_layout.addSpacing(8)
+        top_layout.addLayout(name_col)
         top_layout.addStretch()
         top_layout.addWidget(delete_btn)
         top_layout.addWidget(options_btn)
@@ -352,6 +369,28 @@ class MainPageUI(QWidget):
 
         chat_frame.message_status_labels = {}
 
+        # ── YAZMA GÖSTERGESİ ALANI (YENİ) ───────────────────────────────────
+        self._typing_label_frame = None  # her frame için ayrı referans aşağıda atanıyor
+
+        typing_bar = QFrame()
+        typing_bar.setFixedHeight(22)
+        typing_bar.setStyleSheet("background-color: transparent;")
+        typing_layout = QHBoxLayout(typing_bar)
+        typing_layout.setContentsMargins(14, 0, 0, 0)
+
+        typing_lbl = QLabel("")
+        typing_lbl.setStyleSheet("font-size: 12px; color: #667781; font-style: italic;")
+        typing_layout.addWidget(typing_lbl)
+        typing_layout.addStretch()
+
+        chat_frame.typing_label = typing_lbl  # referans sakla
+        chat_frame.typing_dots = 0  # animasyon sayacı
+        chat_frame.typing_timer = QTimer()  # nokta animasyon timer'ı
+        chat_frame.typing_timer.setInterval(400)
+        chat_frame.typing_timer.timeout.connect(
+            lambda f=chat_frame: self._animate_typing_dots(f)
+        )
+
         # ── ALT BAR ──────────────────────────────────────────
         bottom_bar = QFrame()
         bottom_bar.setFixedHeight(60)
@@ -374,15 +413,120 @@ class MainPageUI(QWidget):
         send_btn.clicked.connect(lambda: self.on_send_clicked(contact_name, msg_input))
         msg_input.returnPressed.connect(lambda: self.on_send_clicked(contact_name, msg_input))
 
+        # ← YENİ: yazma sinyali — debounce ile
+        msg_input.textChanged.connect(
+            lambda text, cn=contact_name: self._on_input_changed(cn, text)
+        )
+
         bottom_layout.addWidget(msg_input)
         bottom_layout.addWidget(send_btn)
 
         # ── HEPSİNİ ANA LAYOUT'A EKLE ────────────────────────
         layout.addWidget(top_bar)
         layout.addWidget(scroll)  # scroll genişler, stretch alır
+        layout.addWidget(typing_bar)
         layout.addWidget(bottom_bar)
 
         return chat_frame
+
+    def _on_input_changed(self, chat_name: str, text: str):
+        """Kullanıcı yazıyor — 1.5 sn duraklayınca yazmayı bıraktı sinyali gönder."""
+        if chat_name not in self._typing_timers:
+            # İlk karakter: yazıyor sinyali gönder
+            self.typing_signal.emit(chat_name, True)
+            timer = QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(lambda cn=chat_name: self._on_typing_stopped(cn))
+            timer.start(1500)
+            self._typing_timers[chat_name] = timer
+        else:
+            # Yeni karakter geldi, zamanlayıcıyı sıfırla
+            self._typing_timers[chat_name].stop()
+            self._typing_timers[chat_name].start(1500)
+
+        # Input boşaldıysa hemen durdur
+        if not text.strip():
+            self._on_typing_stopped(chat_name)
+
+    def _on_typing_stopped(self, chat_name: str):
+        self.typing_signal.emit(chat_name, False)
+        if chat_name in self._typing_timers:
+            self._typing_timers[chat_name].stop()
+            del self._typing_timers[chat_name]
+
+    # ─── YENİ: YAZMA GÖSTERGESİ ANİMASYONU ──────────────────────────────────
+    def _animate_typing_dots(self, chat_frame):
+        chat_frame.typing_dots = (chat_frame.typing_dots + 1) % 4
+        dots = "." * chat_frame.typing_dots
+        sender = getattr(chat_frame, '_typing_sender', '')
+        is_group = getattr(chat_frame, 'is_group', False)
+        if is_group and sender:
+            chat_frame.typing_label.setText(f"{sender} yazıyor{dots}")
+        else:
+            chat_frame.typing_label.setText(f"yazıyor{dots}")
+
+    # ─── YENİ: YAZMA GÖSTERGESİNİ GÖSTER / GİZLE ────────────────────────────
+    def show_typing_indicator(self, chat_name: str, sender: str):
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == chat_name:
+                widget._typing_sender = sender
+                widget.typing_label.setText("yazıyor.")
+                if not widget.typing_timer.isActive():
+                    widget.typing_timer.start()
+                break
+
+    def hide_typing_indicator(self, chat_name: str):
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == chat_name:
+                widget.typing_timer.stop()
+                widget.typing_label.setText("")
+                widget.typing_dots = 0
+                break
+
+    # ─── YENİ: DURUM ÇUBUĞUNU GÜNCELLE ──────────────────────────────────────
+    def update_chat_status_bar(self, username: str, status: str, last_seen_ts=None):
+        """Sohbet ekranının üst barındaki durum etiketini günceller."""
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == username:
+                label = getattr(widget, 'status_label', None)
+                if label is None:
+                    break
+
+                if status == "online":
+                    label.setText("● Çevrimiçi")
+                    label.setStyleSheet("font-size: 11px; color: #22c55e; font-weight: 600;")
+                else:
+                    # Son görülme zamanı
+                    if last_seen_ts:
+                        try:
+                            dt = datetime.datetime.fromtimestamp(float(last_seen_ts))
+                            now = datetime.datetime.now()
+                            diff = now - dt
+
+                            if diff.total_seconds() < 60:
+                                time_str = "az önce"
+                            elif diff.total_seconds() < 3600:
+                                mins = int(diff.total_seconds() // 60)
+                                time_str = f"{mins} dakika önce"
+                            elif diff.days == 0:
+                                time_str = dt.strftime("bugün %H:%M")
+                            elif diff.days == 1:
+                                time_str = dt.strftime("dün %H:%M")
+                            else:
+                                time_str = dt.strftime("%d.%m.%Y %H:%M")
+
+                            label.setText(f"Son görülme: {time_str}")
+                        except Exception:
+                            label.setText("Çevrimdışı")
+                    else:
+                        label.setText("Çevrimdışı")
+
+                    label.setStyleSheet("font-size: 11px; color: #667781;")
+                label.setVisible(True)
+                break
 
     def confirm_delete_chat(self, chat_name):
         """Çöp kutusuna basıldığında sohbeti silme onayı ister."""
@@ -418,6 +562,8 @@ class MainPageUI(QWidget):
         if text:  # Boş mesaj gitmesin
             self.send_message_signal.emit(chat_name, text)
             input_field.clear()  # Gönderdikten sonra kutuyu temizle
+            # Gönderince yazmayı durdur
+            self._on_typing_stopped(chat_name)
 
     def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None, timestamp=None, sender_name=None):
         if read_by is None:

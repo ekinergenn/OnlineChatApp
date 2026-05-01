@@ -16,6 +16,15 @@ class MessageHandler:
         elif msg_type == "messages_read_receipt":
             self.services['message_service'].receive_messages_read_receipt(payload)
 
+        elif msg_type == "typing_indicator":
+            self.services['message_service'].receive_typing_indicator(payload)
+
+        elif msg_type == "user_status_update":
+            self.services['chat_service'].handle_user_status_update(payload)
+
+        elif msg_type == "get_user_status_response":
+            self.services['chat_service'].handle_user_status_response(payload)
+
         elif msg_type == "login_response":
             self.services['logreg_service'].handle_server_response(payload)
 

@@ -18,12 +18,15 @@ class ChatController():
         self.main_page.start_chat_signal.connect(self.handle_start_chat)
         self.main_page.delete_chat_signal.connect(self.handle_delete_chat)
         self.main_page.profile_page.delete_account_signal.connect(self.handle_delete_account)
-        
+
+        self.main_page.load_history_signal.connect(self.handle_chat_opened)
+
         # Service signals
         self.chat_service.user_chats_loaded_signal.connect(self.load_user_chats)
         self.chat_service.search_results_signal.connect(self.main_page.show_search_results)
         self.chat_service.create_chat_response_signal.connect(self.on_chat_created)
         self.chat_service.delete_chat_response_signal.connect(self.on_chat_deleted)
+        self.chat_service.user_status_signal.connect(self.on_user_status_received)
         if self.block_service:
             self.block_service.block_status_changed_signal.connect(self.on_block_status_received)
         self.chat_service.all_users_loaded_signal.connect(self.on_all_users_loaded)
@@ -32,11 +35,31 @@ class ChatController():
         self.main_page.create_group_signal.connect(self.handle_create_group)
         self.main_page.profile_page.update_profile_signal.connect(self.handle_update_profile)
 
+    def handle_chat_opened(self, chat_name: str):
+        for i in range(self.main_page.chat_screens_stack.count()):
+            widget = self.main_page.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == chat_name:
+                is_group = getattr(widget, 'is_group', False)
+                if not is_group and chat_name != "__chatbot__":
+                    # Kısa gecikme ile sor — widget tam oturmuş olsun
+                    from PyQt5.QtCore import QTimer
+                    QTimer.singleShot(100, lambda u=chat_name: self.chat_service.send_get_user_status_request(u))
+                break
+
     def set_current_user(self, profile: dict):
         self.current_user_id = profile.get("user_id")
         self.current_username = profile.get("username")
         
         self.chat_service.send_get_user_chats_request(self.current_username)
+
+    def on_user_status_received(self, payload: dict):
+        """Online/offline durumunu sohbet ekranının üst barına yansıtır."""
+        username = payload.get("username")
+        status = payload.get("status")  # "online" | "offline"
+        last_seen_ts = payload.get("last_seen")
+
+        self.main_page.update_chat_status_bar(username, status, last_seen_ts)
+
 
     def on_block_status_received(self, payload: dict):
         # Sunucudan gelen block yanıtını işle
@@ -108,6 +131,12 @@ class ChatController():
                     else:
                         widget.block_action.setText("🚫 Kişiyi Engelle")
                     break
+
+                for chat in chats:
+                    if not chat.get("is_group", False):
+                        chat_name = chat.get("chat_name")
+                        if chat_name:
+                            self.chat_service.send_get_user_status_request(chat_name)
 
             # Yükleme işlemi message_controller'a devrediliyor
             self.message_controller.load_historical_messages(chat_name, chat_id, chat.get("messages", []))

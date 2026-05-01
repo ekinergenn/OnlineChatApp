@@ -1,3 +1,5 @@
+from PyQt5.QtCore import QTimer
+
 class MessageController():
     def __init__(self, main_page, message_service):
         self.main_page = main_page
@@ -5,17 +7,66 @@ class MessageController():
         self.current_user_id = None
         self.current_username = None
 
+        self._typing_timers = {}
+
         # Signal connections
         self.main_page.send_message_signal.connect(self.handle_send_message)
         self.main_page.load_history_signal.connect(self.handle_chat_switched)
+
+        # ← YENİ: input kutusu değişince typing signal gönder
+        self.main_page.typing_signal.connect(self.handle_typing)
         
         # Service signals
         self.message_service.receive_message_signal.connect(self.on_message_received)
         self.message_service.messages_read_receipt_signal.connect(self.on_messages_read_receipt)
+        self.message_service.typing_indicator_signal.connect(self.on_typing_indicator_received)
 
     def set_current_user(self, profile: dict):
         self.current_user_id = profile.get("user_id")
         self.current_username = profile.get("username")
+
+    def handle_typing(self, chat_name: str, is_typing: bool):
+        """Kullanıcı yazmaya başlayınca/bitirince sunucuya bildirir."""
+        chat_id = None
+        for i in range(self.main_page.chat_screens_stack.count()):
+            widget = self.main_page.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == chat_name:
+                chat_id = getattr(widget, 'current_chat_id', None)
+                break
+
+        if chat_id and self.current_username:
+            self.message_service.send_typing_indicator(chat_id, self.current_username, is_typing)
+
+    def on_typing_indicator_received(self, payload: dict):
+        """Karşı taraftan gelen yazıyor bilgisini UI'da göster/gizle."""
+        chat_id = payload.get("chat_id")
+        sender = payload.get("sender")
+        is_typing = payload.get("is_typing", False)
+
+        # chat_id → chat_name bul
+        chat_name = chat_id
+        for i in range(self.main_page.chat_screens_stack.count()):
+            widget = self.main_page.chat_screens_stack.widget(i)
+            if getattr(widget, 'current_chat_id', None) == chat_id:
+                chat_name = getattr(widget, 'contact_name', chat_id)
+                break
+
+        if is_typing:
+            self.main_page.show_typing_indicator(chat_name, sender)
+            # 5 saniye içinde yeni typing gelmezse otomatik gizle
+            if chat_id in self._typing_timers:
+                self._typing_timers[chat_id].stop()
+            timer = QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(lambda: self.main_page.hide_typing_indicator(chat_name))
+            timer.start(5000)
+            self._typing_timers[chat_id] = timer
+        else:
+            if chat_id in self._typing_timers:
+                self._typing_timers[chat_id].stop()
+                del self._typing_timers[chat_id]
+            self.main_page.hide_typing_indicator(chat_name)
+
 
     def handle_send_message(self, chat_name, text):
         actual_chat_id = None

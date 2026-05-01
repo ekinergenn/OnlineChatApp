@@ -17,6 +17,7 @@ class ChatServer:
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.clients = []
         self.online_users = {}
+        self.last_seen = {}
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
@@ -68,12 +69,36 @@ class ChatServer:
                 user_to_remove = username
                 break
         if user_to_remove:
+            self.last_seen[user_to_remove] = int(time.time())  # ← YENİ
             del self.online_users[user_to_remove]
             print(f"[SİSTEM] {user_to_remove} online listesinden çıkarıldı.")
+
+            # ← YENİ: diğer kullanıcılara offline bildirimi gönder
+            self._broadcast_status(user_to_remove, "offline", self.last_seen[user_to_remove])
 
         if conn in self.clients:
             self.clients.remove(conn)
         conn.close()
+
+    def _broadcast_status(self, username, status, last_seen_ts=None):
+        """İlgili kullanıcının durumunu sohbet ettiği herkese bildirir."""
+        all_chats = get_all_chats()
+        notified = set()
+
+        for chat in all_chats:
+            if username in chat.get("members", []):
+                for member in chat["members"]:
+                    if member != username and member in self.online_users and member not in notified:
+                        packet = {
+                            "type": "user_status_update",
+                            "payload": {
+                                "username": username,
+                                "status": status,
+                                "last_seen": last_seen_ts
+                            }
+                        }
+                        self.send_packet(self.online_users[member], packet)
+                        notified.add(member)
 
     def process_request(self, conn, packet):
         """İstemcinin gönderdiği 'type' değerine göre cevap üretir."""
@@ -89,6 +114,7 @@ class ChatServer:
             if user and user["password"] == password:
                 self.online_users[user["username"]] = conn
                 print(self.online_users)
+                self._broadcast_status(user["username"], "online")
                 response = {
                     "type": "login_response",
                     "payload": {
@@ -177,6 +203,43 @@ class ChatServer:
                             "payload": saved_message
                         }
                         self.send_packet(member_socket, response_packet)
+        elif msg_type == "typing_indicator":
+            payload = packet.get("payload", {})
+            chat_id = payload.get("chat_id")
+            sender_name = payload.get("sender")
+            is_typing = payload.get("is_typing", False)
+
+            all_chats = get_all_chats()
+            active_chat = get_chat_(all_chats, chat_id)
+
+            if active_chat:
+                for member in active_chat["members"]:
+                    if member != sender_name and member in self.online_users:
+                        self.send_packet(self.online_users[member], {
+                            "type": "typing_indicator",
+                            "payload": {
+                                "chat_id": chat_id,
+                                "sender": sender_name,
+                                "is_typing": is_typing
+                            }
+                        })
+
+        elif msg_type == "get_user_status_request":
+            payload = packet.get("payload", {})
+            target_username = payload.get("username")
+
+            is_online = target_username in self.online_users
+            last_seen_ts = self.last_seen.get(target_username)
+
+            self.send_packet(conn, {
+                "type": "get_user_status_response",
+                "payload": {
+                    "username": target_username,
+                    "status": "online" if is_online else "offline",
+                    "last_seen": last_seen_ts
+                }
+            })
+
 
         elif msg_type == "mark_messages_read":
             payload = packet.get("payload", {})

@@ -5,6 +5,7 @@ import uuid
 class MessageService(QObject):
     receive_message_signal = pyqtSignal(dict)
     messages_read_receipt_signal = pyqtSignal(dict)
+    typing_indicator_signal = pyqtSignal(dict)
 
     def __init__(self, client):
         super().__init__()
@@ -44,3 +45,19 @@ class MessageService(QObject):
 
     def receive_messages_read_receipt(self, payload: dict):
         self.messages_read_receipt_signal.emit(payload)
+
+    def send_typing_indicator(self, chat_id: str, sender: str, is_typing: bool):
+        """Yazıyor / yazmayı bıraktı sinyalini sunucuya gönderir."""
+        packet = {
+            "type": "typing_indicator",
+            "payload": {
+                "chat_id": chat_id,
+                "sender": sender,
+                "is_typing": is_typing
+            }
+        }
+        self.client.send_data(packet)
+
+    def receive_typing_indicator(self, payload: dict):
+        """Sunucudan gelen typing_indicator paketini UI'a iletir."""
+        self.typing_indicator_signal.emit(payload)
