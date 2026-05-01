@@ -29,6 +29,7 @@ class ChatController():
         self.chat_service.create_group_response_signal.connect(self.on_group_created)
         self.main_page.request_all_users_signal.connect(self.handle_request_all_users)
         self.main_page.create_group_signal.connect(self.handle_create_group)
+        self.main_page.profile_page.update_profile_signal.connect(self.handle_update_profile)
 
     def set_current_user(self, profile: dict):
         self.current_user_id = profile.get("user_id")
@@ -203,3 +204,14 @@ class ChatController():
         else:
             from PyQt5.QtWidgets import QMessageBox
             QMessageBox.warning(self.main_page, "Hata", "Grup oluşturulamadı.")
+
+    def handle_update_profile(self, data):
+        # Username değişmiyor
+        data["username"] = self.current_username
+        print(f"[DEBUG] Profil güncelleme isteği gönderiliyor: {data}")
+
+        packet = {
+            "type": "update_profile_request",
+            "payload": data
+        }
+        self.chat_service.client.send_data(packet)

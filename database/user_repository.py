@@ -75,3 +75,25 @@ def delete_user(username):
 
     print("[DEBUG] Kullanıcı bulunamadı.")
     return False
+
+def update_user_info(username, fullname, email, tel):
+    users = get_all_users()
+    updated = False
+
+    for user in users:
+        if user.get("username") == username:
+            user["fullname"] = fullname
+            user["email"] = email
+            user["tel"] = tel
+            updated = True
+            break
+
+    if updated:
+        from database.db import write_json
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        file_path = os.path.join(base_dir, "database","data", "users.json")
+
+        write_json(file_path, users)
+        return True
+    return False

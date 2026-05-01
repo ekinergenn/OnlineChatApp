@@ -10,6 +10,7 @@ from PyQt5.QtGui import QCursor, QFont
 class ProfilePageUI(QWidget):
     logout_signal = pyqtSignal()
     delete_account_signal = pyqtSignal()
+    update_profile_signal = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -113,6 +114,7 @@ class ProfilePageUI(QWidget):
         # sinyaller
         logout_btn.clicked.connect(self.logout_signal.emit)
         delete_btn.clicked.connect(self.handle_delete_click)
+        save_btn.clicked.connect(self.handle_save_click)
 
         scroll.setWidget(container)
         self.main_layout.addWidget(scroll)
@@ -165,6 +167,15 @@ class ProfilePageUI(QWidget):
         group_layout.addWidget(edit)
         self.container_layout.addLayout(group_layout)
         return edit
+
+    def handle_save_click(self):
+        updated_data = {
+            "fullname": f"{self.name_input.text()} {self.surname_input.text()}".strip(),
+            "tel": self.phone_input.text(),
+            "email": self.email_input.text()
+        }
+        self.update_profile_signal.emit(updated_data)
+        QMessageBox.information(self, "Bilgi", "Güncelleme isteği gönderildi.")
 
 
 if __name__ == "__main__":

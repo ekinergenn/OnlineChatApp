@@ -465,6 +465,24 @@ class ChatServer:
 
             self.send_packet(conn, response)
 
+        elif msg_type == "update_profile_request":
+            payload = packet.get("payload", {})
+            username = payload.get("username")
+
+            from database.user_repository import update_user_info
+            success = update_user_info(
+                username=username,
+                fullname=payload.get("fullname"),
+                email=payload.get("email"),
+                tel=payload.get("tel")
+            )
+
+            response = {
+                "type": "update_profile_response",
+                "payload": {"status": "success" if success else "fail"}
+            }
+            self.send_packet(conn, response)
+
         # elif msg_type == "create_chat_request":
         #     payload = packet.get("payload", {})
         #     members = payload.get("members", []) # [gönderen, alıcı]
