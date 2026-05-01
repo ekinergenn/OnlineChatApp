@@ -311,7 +311,8 @@ class ChatServer:
                     "other_user_id": other_user_id,
                     "messages": chat_messages,
                     "block_status": block_status,
-                    "is_group": chat_obj.get("is_group", False) if chat_obj else False
+                    "is_group": chat_obj.get("is_group", False) if chat_obj else False,
+                    "members": chat_obj.get("members", []) if chat_obj else []
                 })
 
             response = {

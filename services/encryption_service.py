@@ -1,5 +1,9 @@
 import os
 import base64
+import warnings
+from cryptography.utils import CryptographyDeprecationWarning
+warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
+
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -181,6 +185,19 @@ class EncryptionService(QObject):
         except Exception as e:
             print(f"[ŞİFRE ÇÖZME HATASI] {e}")
             return None
+
+    # ────────────────────── GRUP ANAHTAR YÖNETİMİ ───────────────────────────
+
+    def all_group_keys_ready(self, members: list) -> bool:
+        """Verilen tüm üyelerin genel anahtarları önbellekte mi kontrol eder."""
+        return all(m in self.public_keys for m in members)
+
+    def fetch_missing_group_keys(self, members: list):
+        """Önbellekte olmayan üyelerin genel anahtarlarını sunucudan ister."""
+        for member in members:
+            if member not in self.public_keys:
+                print(f"[GRUP E2EE] {member} için anahtar eksik, isteniyor...")
+                self.send_get_public_key_request(member)
 
     # ────────────────────────── AĞ İŞLEMLERİ ────────────────────────────────
 

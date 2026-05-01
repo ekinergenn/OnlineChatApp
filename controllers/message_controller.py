@@ -97,8 +97,48 @@ class MessageController:
             print(f"[HATA] '{chat_name}' için chat_id bulunamadı, mesaj gönderilemez!")
             return
 
-        if is_group or not self.encryption_service:
-            # Grup sohbetleri ve şifreleme devre dışıysa düz gönder
+        if is_group and self.encryption_service:
+            # Grup E2EE: Tüm üyelerin anahtarlarını topla
+            widget_ref = None
+            for i in range(self.main_page.chat_screens_stack.count()):
+                w = self.main_page.chat_screens_stack.widget(i)
+                if hasattr(w, 'contact_name') and w.contact_name == chat_name:
+                    widget_ref = w
+                    break
+
+            members = getattr(widget_ref, 'members', []) if widget_ref else []
+            other_members = [m for m in members if m != self.current_username]
+
+            if self.encryption_service.all_group_keys_ready(other_members):
+                # Tüm anahtarlar hazır: şifrele ve gönder
+                recipient_keys = {m: self.encryption_service.public_keys[m] for m in other_members}
+                recipient_keys[self.current_username] = self.encryption_service.get_public_key_pem()
+                encrypted_data = self.encryption_service.encrypt_message(text, recipient_keys)
+                if encrypted_data:
+                    self.message_service.send_chat_message(
+                        chat_id=actual_chat_id,
+                        content="[Şifreli Mesaj]",
+                        sender_id=self.current_user_id or 1,
+                        sender=self.current_username or "",
+                        encrypted_data=encrypted_data
+                    )
+                else:
+                    print("[GRUP E2EE] Şifreleme başarısız.")
+            else:
+                # Eksik anahtarlar var: beklet ve çek
+                missing = [m for m in other_members if m not in self.encryption_service.public_keys]
+                print(f"[GRUP E2EE] Eksik anahtarlar: {missing}, mesaj beklemeye alındı.")
+                self._pending_messages.append({
+                    "chat_name": chat_name,
+                    "text": text,
+                    "chat_id": actual_chat_id,
+                    "group_members": other_members
+                })
+                self.encryption_service.fetch_missing_group_keys(other_members)
+            return
+
+        if not self.encryption_service:
+            # Şifreleme yoksa düz gönder
             self.message_service.send_chat_message(
                 chat_id=actual_chat_id,
                 content=text,
@@ -144,9 +184,18 @@ class MessageController:
         """Beklenen anahtar gelince bekleyen mesajları gönder."""
         username = data.get("username")
         for msg in list(self._pending_messages):
-            if msg["chat_name"] == username:
-                self._pending_messages.remove(msg)
-                self.handle_send_message(msg["chat_name"], msg["text"])
+            group_members = msg.get("group_members")
+
+            if group_members:
+                # Grup mesajı: tüm üyelerin anahtarları geldi mi kontrol et
+                if self.encryption_service and self.encryption_service.all_group_keys_ready(group_members):
+                    self._pending_messages.remove(msg)
+                    self.handle_send_message(msg["chat_name"], msg["text"])
+            else:
+                # 1-1 mesaj: hedef kişinin anahtarı geldiyse gönder
+                if msg["chat_name"] == username:
+                    self._pending_messages.remove(msg)
+                    self.handle_send_message(msg["chat_name"], msg["text"])
 
     # ───────────────────────── MESAJ ALMA ─────────────────────────────────────
 

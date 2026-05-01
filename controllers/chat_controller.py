@@ -40,12 +40,22 @@ class ChatController():
             widget = self.main_page.chat_screens_stack.widget(i)
             if getattr(widget, 'contact_name', None) == chat_name:
                 is_group = getattr(widget, 'is_group', False)
+                enc = getattr(self.message_controller, 'encryption_service', None)
+
                 if not is_group and chat_name != "__chatbot__":
                     from PyQt5.QtCore import QTimer
                     QTimer.singleShot(100, lambda u=chat_name: self.chat_service.send_get_user_status_request(u))
-                    # E2EE: Anahtarı her sohbet açılışında tazele
-                    if hasattr(self.message_controller, 'encryption_service') and self.message_controller.encryption_service:
-                        QTimer.singleShot(200, lambda u=chat_name: self.message_controller.encryption_service.send_get_public_key_request(u))
+                    # E2EE: 1-1 sohbette alıcının anahtarını tazele
+                    if enc:
+                        QTimer.singleShot(200, lambda u=chat_name: enc.send_get_public_key_request(u))
+
+                elif is_group and enc:
+                    # E2EE: Grup sohbeti açılınca tüm üyelerin eksik anahtarlarını çek
+                    members = getattr(widget, 'members', [])
+                    other_members = [m for m in members if m != self.current_username]
+                    from PyQt5.QtCore import QTimer
+                    QTimer.singleShot(200, lambda m=other_members: enc.fetch_missing_group_keys(m))
+
                 break
 
     def set_current_user(self, profile: dict):
@@ -119,6 +129,7 @@ class ChatController():
             other_user_id = chat.get("other_user_id")
             block_status  = chat.get("block_status", "none")
             is_group      = chat.get("is_group", False)
+            members       = chat.get("members", [])  # Grup üyeleri
 
             # Arayüze sohbet kartını ekle
             self.main_page.add_new_chat_to_ui(chat_name, is_group=is_group)
@@ -129,6 +140,7 @@ class ChatController():
                 if getattr(widget, 'contact_name', None) == chat_name:
                     widget.other_user_id = str(other_user_id) if other_user_id else None
                     widget.is_group = is_group
+                    widget.members = members  # Üye listesini sakla
                     if block_status == "blocked_by_me":
                         widget.block_action.setText("🔓 Engeli Kaldır")
                     else:
@@ -139,8 +151,6 @@ class ChatController():
             if not is_group:
                 self.chat_service.send_get_user_status_request(chat_name)
 
-            # Geçmiş mesajları yükle — chat_name/chat_id değişkenleri üstteki
-            # 'for chat in chats' döngüsünden alınıyor, kesinlikle doğru değerler.
             self.message_controller.load_historical_messages(chat_name, chat_id, messages)
             self.loaded_chats.add(chat_id)
 
@@ -226,12 +236,14 @@ class ChatController():
         if payload.get("status") == "success":
             group_name = payload.get("group_name")
             chat_id = payload.get("chat_id")
+            members = payload.get("members", [])
             self.main_page.add_new_chat_to_ui(group_name, is_group=True)
             for i in range(self.main_page.chat_screens_stack.count()):
                 widget = self.main_page.chat_screens_stack.widget(i)
                 if getattr(widget, 'contact_name', None) == group_name:
                     widget.current_chat_id = chat_id
                     widget.is_group = True
+                    widget.members = members  # Üye listesini sakla (E2EE için kritik)
                     break
         else:
             from PyQt5.QtWidgets import QMessageBox
