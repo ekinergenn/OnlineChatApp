@@ -2,11 +2,12 @@ from PyQt5.QtWidgets import QMessageBox
 from services.block_service import BlockService
 
 class ChatController():
-    def __init__(self, main_page, chat_service, message_controller, block_service = None):
+    def __init__(self, main_page, chat_service, message_controller, block_service = None, chatbot_service = None):
         self.block_service = block_service
         self.main_page = main_page
         self.chat_service = chat_service
         self.message_controller = message_controller
+        self.chatbot_service = chatbot_service
         self.current_user_id = None
         self.current_username = None
         self.loaded_chats = set()
@@ -215,3 +216,18 @@ class ChatController():
             "payload": data
         }
         self.chat_service.client.send_data(packet)
+
+    def reset_user_data(self):
+        self.current_username = None
+        self.current_user_id = None
+        self.loaded_chats = set()
+
+        # ChatService temizliği
+        if hasattr(self, 'chat_service') and self.chat_service is not None:
+            self.chat_service.reset()
+
+        # ChatbotService temizliği
+        if hasattr(self, 'chatbot_service') and self.chatbot_service is not None:
+            self.chatbot_service.reset_conversation()
+
+        print("[CONTROLLER] Kullanıcı verileri temizlendi.")

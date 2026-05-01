@@ -60,7 +60,7 @@ class MainApplicationWindow(QMainWindow):
             on_login_success=self.on_login_success
         )
         self.message_controller = MessageController(self.main_page, self.message_service)
-        self.chat_controller = ChatController(self.main_page, self.chat_service, self.message_controller, self.block_service)
+        self.chat_controller = ChatController(self.main_page, self.chat_service, self.message_controller, self.block_service,self.chatbot_service)
         self.chatbot_controller = ChatbotController(self.main_page, self.chatbot_service)
 
         # 7. Bağlan ve dinle
@@ -87,6 +87,9 @@ class MainApplicationWindow(QMainWindow):
             #Login sayfasına dön indeks 0
             self.stacked_widget.setCurrentIndex(0)
             self.login_page.clear_fields()
+            self.main_page.reset_ui()
+            self.chat_controller.reset_user_data()
+            self.stacked_widget.setCurrentIndex(0)
 
             #kullanıcı verisini temizle
             self.current_user = None

@@ -1028,6 +1028,31 @@ class MainPageUI(QWidget):
                         item.widget().deleteLater()
                 break
 
+    def reset_ui(self):
+        # sol taraftaki sohbet listesini temizle
+        # Stretch (en alttaki boşluk) hariç tüm sohbet kartlarını siler
+        while self.scroll_layout.count() > 0:
+            item = self.scroll_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        # sağ taraftaki mesaj ekranlarını temizle (StackedWidget)
+        # sadece 0. indeksteki Hoş Geldin ekranını bırak, diğerlerini sil
+        while self.chat_screens_stack.count() > 1:
+            widget = self.chat_screens_stack.widget(1)
+            self.chat_screens_stack.removeWidget(widget)
+            widget.deleteLater()
+
+        # hoş geldin ekranına geri dön
+        self.chat_screens_stack.setCurrentIndex(0)
+
+        # arama kutusunu temizle
+        if hasattr(self, 'search_input'):
+            self.search_input.clear()
+
+        print("[UI] Tüm arayüz bileşenleri sıfırlandı.")
+
 
 
 if __name__ == "__main__":

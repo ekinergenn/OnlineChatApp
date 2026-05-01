@@ -91,3 +91,8 @@ class ChatService(QObject):
 
     def handle_create_group_response(self, payload: dict):
         self.create_group_response_signal.emit(payload)
+
+    def reset(self):
+        #servis içindeki sadece kullanıcıya özel geçici verileri sıfırlar
+        self._pending_delete_chat_name = None
+        print("[SERVICE] ChatService verileri temizlendi, bağlantı (client) korunuyor.")
