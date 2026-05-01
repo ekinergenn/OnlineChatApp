@@ -836,10 +836,10 @@ class MainPageUI(QWidget):
         else:
             self.clear_search_results()
 
-    def show_search_results(self, users: list):
+    def show_search_results(self, results: list):
         self.clear_search_results()
-        for user in users:
-            result_item = self.create_search_result_item(user)
+        for item in results:
+            result_item = self.create_search_result_item(item)
             self.scroll_layout.insertWidget(0, result_item)
 
     def clear_search_results(self):
@@ -851,7 +851,7 @@ class MainPageUI(QWidget):
                     self.scroll_layout.removeWidget(widget)
                     widget.deleteLater()
 
-    def create_search_result_item(self, user: dict):
+    def create_search_result_item(self, item_data: dict):
         item_frame = ClickableFrame()
         item_frame.is_search_result = True
         item_frame.setFixedHeight(75)
@@ -865,7 +865,13 @@ class MainPageUI(QWidget):
         layout.setContentsMargins(15, 10, 15, 10)
         layout.setSpacing(15)
 
-        avatar = QLabel("👤")
+        is_group = item_data.get("is_group", False)
+
+        avatar_char = "👥" if is_group else "👤"
+        display_name = item_data.get("chat_name") if is_group else item_data.get("fullname")
+        sub_info = "Grup Sohbeti" if is_group else f"@{item_data.get('username')}"
+
+        avatar = QLabel(avatar_char)
         avatar.setFixedSize(50, 50)
         avatar.setAlignment(Qt.AlignCenter)
         avatar.setStyleSheet("background-color: #dfe5e7; border-radius: 25px; font-size: 24px;")
@@ -873,10 +879,10 @@ class MainPageUI(QWidget):
         text_layout = QVBoxLayout()
         text_layout.setSpacing(2)
 
-        name_label = QLabel(user.get("fullname", ""))
+        name_label = QLabel(display_name)
         name_label.setStyleSheet("font-size: 16px; color: #111b21; font-weight: 500;")
 
-        info_label = QLabel(f"@{user.get('username')} • {user.get('tel', '')}")
+        info_label = QLabel(sub_info)
         info_label.setStyleSheet("font-size: 13px; color: #667781;")
 
         text_layout.addWidget(name_label)
@@ -886,10 +892,40 @@ class MainPageUI(QWidget):
         layout.addLayout(text_layout)
         layout.addStretch()
 
-        username = user.get("username")
-        item_frame.clicked.connect(lambda: self.start_chat_signal.emit(username))
+        # Tıklama olayı
+        if is_group:
+            # Gruba tıklandığında sol listeye geri ekle
+            item_frame.clicked.connect(lambda: self._add_existing_group_back(item_data))
+        else:
+            # Kullanıcıya tıklandığında sohbet başlat
+            username = item_data.get("username")
+            item_frame.clicked.connect(lambda: self.start_chat_signal.emit(username))
 
         return item_frame
+
+    def _add_existing_group_back(self, group_data):
+        #kullanıcının zaten üyesi olduğu grubu sol listeye geri getir
+        chat_name = group_data.get("chat_name")
+        chat_id = group_data.get("chat_id")
+
+        # eğer listede zaten varsa geçiş yap
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == chat_name:
+                self.switch_to_chat(chat_name)
+                return
+
+        # yoksa yeniymiş gibi ekle
+        self.add_new_chat_to_ui(chat_name, is_group=True)
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == chat_name:
+                widget.current_chat_id = chat_id
+                break
+
+        self.clear_search_results()
+        self.search_input.clear()
+        self.switch_to_chat(chat_name)
 
     def update_chat_last_message(self, chat_name, content, is_mine):
         prefix = "Sen: " if is_mine else ""

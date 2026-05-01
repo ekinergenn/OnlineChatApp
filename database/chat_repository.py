@@ -173,3 +173,17 @@ def clean_only_read_status(chat_id, username):
             write_json(file_path, messages)
         except Exception as e:
             print(f"[HATA] Okundu bilgisi temizlenemedi: {e}")
+
+def hide_group_chat(chat_id: str, username: str) -> bool:
+    #kullanıcı grubu sildiğinde üyelikten çıkarma
+    #okundu bilgisini temizler
+    #arayüzden kaybolur ama veri tabanında üyelik durur
+    chats = get_all_chats()
+    chat = get_chat_(chats, chat_id)
+
+    if chat and chat.get("is_group"):
+        members = chat.get("members", [])
+        if username in members:
+            clean_only_read_status(chat_id, username)
+            return True
+    return False

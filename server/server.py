@@ -362,11 +362,11 @@ class ChatServer:
             chat_obj = get_chat_(all_chats, chat_id)
 
             if chat_obj and chat_obj.get("is_group"):
-                from database.chat_repository import leave_group_chat
-                # sadece üyeyi çıkar
-                success = leave_group_chat(chat_id, username)
+                from database.chat_repository import hide_group_chat
+                success = hide_group_chat(chat_id, username)
+
             else:
-                # ikilisohbetlerde silme işlemi devam
+                # İkili sohbetlerde silme işlemi (dosyayı siler)
                 from database.chat_repository import delete_chat
                 success = delete_chat(chat_id)
 
@@ -378,18 +378,35 @@ class ChatServer:
 
         elif msg_type == "search_users_request":
             payload = packet.get("payload", {})
-            query = payload.get("query", "")
+            query = payload.get("query", "").lower()
             requester = payload.get("username", "")
-
-            results = search_users(query, exclude_username=requester)
-            # Sanitize results (remove passwords)
             sanitized_results = []
-            for u in results:
+
+            # kullanıcıları tara
+            user_results = search_users(query, exclude_username=requester)
+
+            for u in user_results:
                 sanitized_results.append({
+                    "is_group": False,
                     "username": u.get("username"),
                     "fullname": u.get("fullname"),
                     "user_id": u.get("user_id")
                 })
+
+            # grupları tara
+            all_chats = get_all_chats()
+            if isinstance(all_chats, list):
+                for chat in all_chats:
+                    # Kullanıcının üyesi olduğu grupları tara
+                    if chat.get("is_group") is True and requester in chat.get("members", []):
+                        chat_name = chat.get("chat_name", "")
+                        if query in chat_name.lower():
+                            sanitized_results.append({
+                                "is_group": True,
+                                "chat_id": chat.get("chat_id"),
+                                "chat_name": chat_name,
+                                "members": chat.get("members")
+                            })
 
             response = {
                 "type": "search_users_response",
