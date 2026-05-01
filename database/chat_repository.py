@@ -75,6 +75,16 @@ def delete_chat(chat_id: int) -> bool:
 
 
 def cleanup_user_chats(username):
+    # tüm mesaj dosyalarını temizler
+    # kullanıcı gruptan çıkmış olsa bile attığı mesajlar dosyalarda duruyor
+    # dongu her dosyaya girip senderi kontrol ederek siler mesajı
+    if os.path.exists(MESSAGES_DIR):
+        for msg_file in os.listdir(MESSAGES_DIR):
+            if msg_file.endswith(".json"):
+                chat_id = msg_file.replace(".json", "")
+                # Her chat_id için mesaj temizleme fonksiyonunu çağırıyoruz
+                clean_group_messages_content(chat_id, username)
+
     all_chats = get_all_chats()
     new_chats = []
 
@@ -87,25 +97,19 @@ def cleanup_user_chats(username):
             msg_file_path = os.path.join(MESSAGES_DIR, f"{chat_id}.json")
 
             if not is_group:
-                # ikili sohbetleri tamamen siler
+                #ikili sohbetleri tamamen sil
                 if os.path.exists(msg_file_path):
-                    try:
-                        os.remove(msg_file_path)
-                    except Exception as e:
-                        print(f"[HATA] Dosya silinemedi: {e}")
-                # bu sohbeti new_chats listesine eklemiyoruz (listeden siliniyor)
+                    try: os.remove(msg_file_path)
+                    except Exception as e: print(f"[HATA] Dosya silinemedi: {e}")
                 continue
             else:
-                #grup sohbetinde kullanıcıyı üyelerden çıkar
+                #grup sohbetinde kullanıcıyı üyelerden çıkar (mesajlarını aynı fonksiyonun ustunde temizledik ztn)
                 chat["members"] = [m for m in members if m != username]
-                #grup mesaj dosyasının içindeki mesajları temizle
-                clean_group_messages_content(chat_id, username)
 
         new_chats.append(chat)
 
-    # chats.json dosyasını güncelle
     write_json(FILENAME, new_chats)
-    print(f"[BİLGİ] {username} için sohbet listesi temizlendi.")
+    print(f"[BİLGİ] {username} için tam temizlik (üyelikler + tüm mesaj geçmişi) tamamlandı.")
 
 
 def clean_group_messages_content(chat_id, username):
@@ -138,3 +142,34 @@ def clean_group_messages_content(chat_id, username):
 
         except Exception as e:
             print(f"[HATA] Grup mesajları temizlenirken hata: {e}")
+
+
+def leave_group_chat(chat_id: str, username: str) -> bool:
+    #kullanıcı cıkar, mesajlar kalir
+    chats = get_all_chats()
+    chat = get_chat_(chats, chat_id)
+
+    if chat and chat.get("is_group"):
+        members = chat.get("members", [])
+        if username in members:
+            # sadece uyeyi sil
+            chat["members"] = [m for m in members if m != username]
+            write_json(FILENAME, chats)
+            # mesajları silmeden sadece 'readby' listesinden ismi çıkar
+            clean_only_read_status(chat_id, username)
+            return True
+    return False
+
+def clean_only_read_status(chat_id, username):
+    #readbydan kullanıcıyı temizler
+    file_path = os.path.join(MESSAGES_DIR, f"{chat_id}.json")
+    if os.path.exists(file_path):
+        try:
+            messages = read_json(file_path)
+            for msg in messages:
+                if "read_by" in msg and isinstance(msg["read_by"], list):
+                    if username in msg["read_by"]:
+                        msg["read_by"].remove(username)
+            write_json(file_path, messages)
+        except Exception as e:
+            print(f"[HATA] Okundu bilgisi temizlenemedi: {e}")

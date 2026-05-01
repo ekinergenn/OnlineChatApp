@@ -5,7 +5,7 @@ import time
 import os
 from database.user_repository import find_user, create_user, search_users, delete_user, update_public_key, get_public_key
 from database.message_repository import save_message, get_messages, mark_messages_as_read
-from database.chat_repository import create_chat, get_all_chats, get_chat_, get_user_chats, delete_chat
+from database.chat_repository import create_chat, get_all_chats, get_chat_, get_user_chats, delete_chat, MESSAGES_DIR
 from database import block_repository
 
 
@@ -357,42 +357,22 @@ class ChatServer:
             payload = packet.get("payload", {})
             chat_id = payload.get("chat_id")
             username = payload.get("username", "")
-            print(f"[SİLME] '{chat_id}' — '{username}' için siliniyor...")
 
             all_chats = get_all_chats()
             chat_obj = get_chat_(all_chats, chat_id)
 
             if chat_obj and chat_obj.get("is_group"):
-                # Grup sohbeti: sadece üyeden çıkar, dosyayı silme
-                members = chat_obj.get("members", [])
-                if username in members:
-                    members.remove(username)
-                    chat_obj["members"] = members
-                    from database.db import write_json
-                    write_json("chats.json", all_chats)
-                    print(f"[SİLME] '{username}' gruptan çıkarıldı, grup devam ediyor.")
-
-                # Eğer grupta kimse kalmadıysa tamamen sil
-                if not members:
-                    delete_chat(chat_id)
-                    import os
-                    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    msg_file = os.path.join(BASE_DIR, "database", "data", "messages", f"{chat_id}.json")
-                    if os.path.exists(msg_file):
-                        os.remove(msg_file)
+                from database.chat_repository import leave_group_chat
+                # sadece üyeyi çıkar
+                success = leave_group_chat(chat_id, username)
             else:
-                # Birebir sohbet: tamamen sil
-                delete_chat(chat_id)
-                import os
-                BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                msg_file = os.path.join(BASE_DIR, "database", "data", "messages", f"{chat_id}.json")
-                if os.path.exists(msg_file):
-                    os.remove(msg_file)
-                    print(f"[SİLME] '{chat_id}.json' mesaj dosyası silindi.")
+                # ikilisohbetlerde silme işlemi devam
+                from database.chat_repository import delete_chat
+                success = delete_chat(chat_id)
 
             response = {
                 "type": "delete_chat_response",
-                "payload": {"status": "success", "chat_id": chat_id}
+                "payload": {"status": "success" if success else "fail", "chat_id": chat_id}
             }
             self.send_packet(conn, response)
 
@@ -627,4 +607,4 @@ class ChatServer:
                     "username": username,
                     "message": "Genel anahtar bulunamadı."
                 }
-            })
+            })

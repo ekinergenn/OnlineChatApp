@@ -140,11 +140,13 @@ class ChatController():
                 if getattr(widget, 'contact_name', None) == chat_name:
                     widget.other_user_id = str(other_user_id) if other_user_id else None
                     widget.is_group = is_group
-                    widget.members = members  # Üye listesini sakla
-                    if block_status == "blocked_by_me":
-                        widget.block_action.setText("🔓 Engeli Kaldır")
-                    else:
-                        widget.block_action.setText("🚫 Kişiyi Engelle")
+                    widget.members = members
+
+                    if not is_group and hasattr(widget, 'block_action'):
+                        if block_status == "blocked_by_me":
+                            widget.block_action.setText("🔓 Engeli Kaldır")
+                        else:
+                            widget.block_action.setText("🚫 Kişiyi Engelle")
                     break
 
             # 1-1 sohbetlerde kullanıcı durumunu sor (sadece bir kez, dışarıda)
@@ -243,7 +245,7 @@ class ChatController():
                 if getattr(widget, 'contact_name', None) == group_name:
                     widget.current_chat_id = chat_id
                     widget.is_group = True
-                    widget.members = members  # Üye listesini sakla (E2EE için kritik)
+                    widget.members = members
                     break
         else:
             from PyQt5.QtWidgets import QMessageBox

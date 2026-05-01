@@ -334,10 +334,18 @@ class MainPageUI(QWidget):
             QMenu::item { padding: 10px 20px; font-size: 14px; color: #111b21; }
             QMenu::item:selected { background-color: #f0f2f5; }
         """)
-        block_action = QAction("🚫 Kişiyi Engelle", chat_frame)
-        block_action.triggered.connect(lambda: self.block_user_signal.emit(contact_name))
-        chat_frame.block_action = block_action
-        menu.addAction(block_action)
+        if is_group:
+            # grup kısmı
+            leave_action = QAction("🚪 Gruptan Ayrıl", chat_frame)
+            leave_action.triggered.connect(lambda _: self.confirm_delete_chat(contact_name, is_group=True))
+            menu.addAction(leave_action)
+            chat_frame.block_action = leave_action
+        else:
+            # ikili chat kısmı
+            block_action = QAction("🚫 Kişiyi Engelle", chat_frame)
+            block_action.triggered.connect(lambda: self.block_user_signal.emit(contact_name))
+            menu.addAction(block_action)
+            chat_frame.block_action = block_action
 
         options_btn.setMenu(menu)
 
@@ -529,18 +537,17 @@ class MainPageUI(QWidget):
                 label.setVisible(True)
                 break
 
-    def confirm_delete_chat(self, chat_name):
-        """Çöp kutusuna basıldığında sohbeti silme onayı ister."""
+    def confirm_delete_chat(self, chat_name, is_group=False):
+        title = 'Gruptan Ayrıl' if is_group else 'Sohbeti Sil'
+        message = (f"'{chat_name}' grubundan ayrılmak istediğinize emin misiniz?" if is_group else
+                   f"'{chat_name}' ile olan sohbeti silmek istediğinize emin misiniz?\nBu işlem geri alınamaz.")
+
         reply = QMessageBox.question(
-            self,
-            'Sohbeti Sil',
-            f"'{chat_name}' ile olan sohbeti silmek istediğinize emin misiniz?\nBu işlem geri alınamaz.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            self, title, message,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
 
         if reply == QMessageBox.Yes:
-            print(f"[{chat_name}] sohbeti silindi!")
             self.delete_chat_signal.emit(chat_name)
 
     def add_new_chat_to_ui(self, chat_name, last_message="", is_group=False):
