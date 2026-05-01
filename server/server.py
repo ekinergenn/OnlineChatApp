@@ -453,6 +453,10 @@ class ChatServer:
             username = payload.get("username")
             print(f"[DEBUG] Silme isteği geldi. Kullanıcı: '{username}'")
 
+            # user chatleri temizlenir
+            from database.chat_repository import cleanup_user_chats
+            cleanup_user_chats(username)
+
             # Repository fonksiyonunu çağır
             from database.user_repository import delete_user
             success = delete_user(username)
