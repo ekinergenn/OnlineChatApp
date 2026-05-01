@@ -97,8 +97,16 @@ class MainApplicationWindow(QMainWindow):
     def on_login_success(self, user_info: dict):
         """Login başarılı olunca çağrılır."""
         self.current_user = user_info  # {"user_id": 1, "username": "nisa", ...}
+
+        self.main_page.reset_ui()  # Giriş anında da temiz bir UI ile başlamak iyidir
         self.chat_controller.set_current_user(user_info)
         self.message_controller.set_current_user(user_info)
+
+        # Ana pencerede MainPage'in olduğu indeks 2 göster
+        self.stacked_widget.setCurrentIndex(2)
+
+        # MainPage içindeki sekmeyi Sohbetler 0 yap
+        self.main_page.main_stack.setCurrentIndex(0)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

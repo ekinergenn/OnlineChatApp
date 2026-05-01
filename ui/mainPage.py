@@ -1045,6 +1045,7 @@ class MainPageUI(QWidget):
             widget.deleteLater()
 
         # hoş geldin ekranına geri dön
+        self.main_stack.setCurrentIndex(0)
         self.chat_screens_stack.setCurrentIndex(0)
 
         # arama kutusunu temizle
