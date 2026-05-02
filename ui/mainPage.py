@@ -110,7 +110,7 @@ class MainPageUI(QWidget):
         self.btn_settings = QPushButton("⚙️")
         self.btn_settings.setToolTip("Ayarlar")
         self.setup_nav_button(self.btn_settings)
-        self.btn_settings.clicked.connect(lambda: self.main_stack.setCurrentIndex(2))
+        self.btn_settings.clicked.connect(self.switch_to_settings_reset)
         nav_layout.addWidget(self.btn_settings)
 
         # Profil
@@ -121,6 +121,12 @@ class MainPageUI(QWidget):
         nav_layout.addWidget(self.btn_profile)
 
         self.main_layout.addWidget(nav_frame)
+
+    def switch_to_settings_reset(self):
+        #ayarlar sayfasına geçer ve detay panelini sıfırlar
+        self.main_stack.setCurrentIndex(2)  # Ayarlar sayfası indeksi
+        if hasattr(self, 'settings_page'):
+            self.settings_page.details_stack.setCurrentIndex(0)
 
     def setup_nav_button(self, btn):
         btn.setFixedSize(40, 40)
@@ -1332,6 +1338,9 @@ class MainPageUI(QWidget):
         # arama kutusunu temizle
         if hasattr(self, 'search_input'):
             self.search_input.clear()
+
+        if hasattr(self, 'settings_page'):
+            self.settings_page.clear_all_data()
 
         print("[UI] Tüm arayüz bileşenleri sıfırlandı.")
 

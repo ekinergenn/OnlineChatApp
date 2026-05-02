@@ -7,6 +7,7 @@ class MessageService(QObject):
     messages_read_receipt_signal = pyqtSignal(dict)
     typing_indicator_signal = pyqtSignal(dict)
     starred_messages_loaded_signal = pyqtSignal(list)
+    unstar_response_signal = pyqtSignal(dict)
 
     def __init__(self, client):
         super().__init__()
@@ -66,6 +67,19 @@ class MessageService(QObject):
     def receive_typing_indicator(self, payload: dict):
         """Sunucudan gelen typing_indicator paketini UI'a iletir."""
         self.typing_indicator_signal.emit(payload)
+
+    def send_unstar_request(self, star_data):
+        #ayarlar sayfasından gelen yıldız kaldırma isteğini sunucuya ilet
+        payload = {
+            "message_id": star_data.get("message_id"),
+            "username": star_data.get("starred_by")
+        }
+        packet = {
+            "type": "unstar_request",
+            "payload": payload
+        }
+        self.client.send_data(packet)
+        print(f"[SERVICE] Yıldız kaldırma isteği sunucuya iletildi: {payload}")
 
     def send_star_message(self, message_data: dict):
         #yıldızlama veya yıldız kaldırma isteğini sunucuya gönderir

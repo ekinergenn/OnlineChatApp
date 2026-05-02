@@ -78,5 +78,10 @@ class MessageHandler:
         elif msg_type == "star_message_response":
             print(f"[İSTEMCİ] Yıldızlama onayı: {payload.get('status')}")
 
+        elif msg_type == "unstar_response":
+            print(">>> HANDLER: Sunucudan yıldız kaldırma yanıtı geldi.")
+            if 'message_service' in self.services:
+                self.services['message_service'].unstar_response_signal.emit(payload)
+
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")

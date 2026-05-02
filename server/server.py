@@ -560,6 +560,21 @@ class ChatServer:
         elif msg_type == "get_public_key_request":
             self.handle_get_public_key_request(conn, packet.get("payload", {}))
 
+        elif msg_type == "unstar_request":
+            payload = packet.get("payload", {})
+            msg_id = payload.get("message_id")
+            username = payload.get("username")  # Yıldızlayan kişi
+
+            from database.starred_repository import remove_starred_message
+            success = remove_starred_message(msg_id, username)
+
+            # istemciye silindiğine dair onay gönder
+            response = {
+                "type": "unstar_response",
+                "payload": {"message_id": msg_id, "success": success}
+            }
+            self.send_packet(conn, response)
+
         elif msg_type == "star_message_request":
             payload = packet.get("payload", {})
             action = payload.get("action")

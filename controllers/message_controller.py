@@ -18,18 +18,32 @@ class MessageController:
         self.main_page.send_message_signal.connect(self.handle_send_message)
         self.main_page.load_history_signal.connect(self.handle_chat_switched)
         self.main_page.typing_signal.connect(self.handle_typing)
+        self.main_page.star_message_signal.connect(self.handle_star_message)
+        self.main_page.get_starred_messages_signal.connect(self.message_service.send_get_starred_messages)
+        self.main_page.unstar_from_settings_signal.connect(self.message_service.send_unstar_request)
 
         # Servis sinyalleri
         self.message_service.receive_message_signal.connect(self.on_message_received)
         self.message_service.messages_read_receipt_signal.connect(self.on_messages_read_receipt)
         self.message_service.typing_indicator_signal.connect(self.on_typing_indicator_received)
-        self.main_page.star_message_signal.connect(self.handle_star_message)
-        self.main_page.get_starred_messages_signal.connect(self.message_service.send_get_starred_messages)
         self.message_service.starred_messages_loaded_signal.connect(self.handle_starred_messages_response)
+        self.message_service.unstar_response_signal.connect(self.handle_unstar_response)
 
         # E2EE: Anahtar hazır olduğunda bekleyen mesajları gönder
         if self.encryption_service:
             self.encryption_service.public_key_fetched_signal.connect(self._on_public_key_fetched)
+
+    def handle_unstar_response(self, payload):
+        """Sunucudan silme onayı geldiğinde tüm listeyi tazeler."""
+        if payload.get("success"):
+            print(f"[DEBUG] Silme başarılı, liste tazeleniyor...")
+
+            #arayüzü temizle
+            self.main_page.settings_page.clear_starred_list()
+
+            #sunucudan güncel listeyi tekrar iste
+            if self.current_username:
+                self.message_service.send_get_starred_messages(self.current_username)
 
     def handle_get_starred_messages(self, username):
         print(f">>> CONTROLLER: {username} için sunucuya istek paketi gönderiliyor...")

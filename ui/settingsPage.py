@@ -300,12 +300,24 @@ class SettingsPageUI(QWidget):
         sender_lbl = QLabel(f"👤 {sender_name}")
         sender_lbl.setStyleSheet("font-weight: bold; color: #3b82f6; border: none;")
 
+        # silme butonu
+        delete_btn = QPushButton("🗑️")
+        delete_btn.setFixedSize(30, 30)
+        delete_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        delete_btn.setStyleSheet("""
+                QPushButton { border: none; background: transparent; font-size: 16px; color: #667781; }
+                QPushButton:hover { color: #ef4444; background-color: #fee2e2; border-radius: 15px; }
+            """)
+
+        delete_btn.clicked.connect(lambda: self.main_page_ref.unstar_from_settings_signal.emit(star_data))
+
         chat_lbl = QLabel(f"📍 {star_data.get('chat_name', 'Sohbet')}")
         chat_lbl.setStyleSheet("font-size: 11px; color: #8696a0; border: none;")
 
         top.addWidget(sender_lbl)
         top.addStretch()
         top.addWidget(chat_lbl)
+        top.addWidget(delete_btn)
 
         # Mesaj İçeriği
         content_lbl = QLabel(star_data.get('content', ''))
@@ -323,3 +335,23 @@ class SettingsPageUI(QWidget):
         self.starred_list_layout.insertWidget(0, card)
         card.show()
         self.starred_container.adjustSize()
+
+    def clear_starred_list(self):
+        #yıldızlı mesajlar listesindeki tüm kartları temizle
+        while self.starred_list_layout.count() > 0:
+            item = self.starred_list_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        self.starred_container.adjustSize()
+
+    def clear_all_data(self):
+        #oturum kapatıldığında tüm yıldızlı mesaj kartlarını temizle
+        while self.starred_list_layout.count() > 0:
+            item = self.starred_list_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        self.details_stack.setCurrentIndex(0)
+        print("[UI] SettingsPage verileri temizlendi.")

@@ -44,14 +44,16 @@ def add_starred_message(message_data: dict) -> bool:
         return False
 
 def remove_starred_message(message_id: str, username: str) -> bool:
-    #bir mesajın yıldızını kaldırır
+    #belirli bir kullanıcının listesinden mesajı sil
     starred = get_all_starred()
-    # hem mesaj ID'si hem de kullanıcı adı eşleşmeli
-    new_starred = [s for s in starred if not (s["message_id"] == message_id and s["starred_by"] == username)]
+    new_starred = [s for s in starred if not (str(s["message_id"]) == str(message_id) and s["starred_by"] == username)]
 
     if len(starred) != len(new_starred):
-        write_json(FILENAME, new_starred)
-        return True
+        try:
+            write_json(FILENAME, new_starred)
+            return True
+        except Exception:
+            return False
     return False
 
 def get_user_starred_messages(username: str) -> list:
