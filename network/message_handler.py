@@ -91,5 +91,21 @@ class MessageHandler:
         elif msg_type == "update_privacy_settings_response":
             print(f"[İSTEMCİ] Gizlilik ayarları güncelleme onayı: {payload.get('status')}")
 
+        # --- Topluluklar ---
+        elif msg_type == "get_user_communities_response":
+            self.services['community_service'].handle_server_response("get_user_communities_response", payload)
+        
+        elif msg_type == "search_communities_response":
+            self.services['community_service'].handle_server_response("search_communities_response", payload)
+            
+        elif msg_type == "create_community_response":
+            self.services['community_service'].handle_server_response("create_community_response", payload)
+            
+        elif msg_type == "join_community_response":
+            self.services['community_service'].handle_server_response("join_community_response", payload)
+            
+        elif msg_type == "community_message":
+            self.services['community_service'].handle_server_response("community_message", payload)
+
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")

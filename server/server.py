@@ -7,7 +7,8 @@ from database.user_repository import find_user, create_user, search_users, delet
     get_public_key, get_privacy_settings, update_privacy_settings
 from database.message_repository import save_message, get_messages, mark_messages_as_read
 from database.chat_repository import create_chat, get_all_chats, get_chat_, get_user_chats, delete_chat, MESSAGES_DIR
-from database import block_repository
+from database import block_repository, community_repository
+from database.db import write_json
 
 
 class ChatServer:
@@ -112,17 +113,24 @@ class ChatServer:
     def process_request(self, conn, packet):
         """İstemcinin gönderdiği 'type' değerine göre cevap üretir."""
         msg_type = packet.get("type")
+        payload = packet.get("payload", {})
 
-        # Senin logReg_service içindeki paket yapına uygun kontrol
-        if msg_type == "login_request":
-            payload = packet.get("payload", {})
+        if msg_type == "community_message":
+            self.handle_community_message(payload)
+        elif msg_type == "create_community_request":
+            self.handle_create_community(conn, payload)
+        elif msg_type == "join_community_request":
+            self.handle_join_community(conn, payload)
+        elif msg_type == "search_communities_request":
+            self.handle_search_communities(conn, payload)
+        elif msg_type == "get_user_communities_request":
+            self.handle_get_user_communities(conn, payload)
+        elif msg_type == "login_request":
             username = payload.get("name")
             password = payload.get("password")
 
             user = find_user(username)
             if user and user["password"] == password:
-                # KRİTİK: Aynı soket önceki oturumlarda başka kullanıcılara atanmış olabilir.
-                # Önce bu sokete bağlı tüm eski kullanıcıları temizle.
                 stale = [u for u, s in list(self.online_users.items()) if s == conn and u != user["username"]]
                 for stale_user in stale:
                     del self.online_users[stale_user]
@@ -154,7 +162,6 @@ class ChatServer:
             self.send_packet(conn, response)
 
         elif msg_type == "register_request":
-            payload = packet.get("payload", {})
             success = create_user(
                 username=payload.get("username"),
                 password=payload.get("password"),
@@ -173,17 +180,13 @@ class ChatServer:
 
 
         elif msg_type == "chat_message":
-            payload = packet.get("payload", {})
             chat_id = payload.get("chat_id")
             sender_name = payload.get("sender")
 
             all_chats = get_all_chats()
             active_chat = get_chat_(all_chats, chat_id)
 
-            # SECURITY CHECK
             if active_chat and (sender_name in active_chat["members"]):
-                # BLOCK CHECK
-                # Find receiver(s)
                 receivers = [m for m in active_chat["members"] if m != sender_name]
                 sender_user = find_user(sender_name)
 
@@ -754,3 +757,103 @@ class ChatServer:
                     "message": "Genel anahtar bulunamadı."
                 }
             })
+
+    def handle_community_message(self, payload):
+        comm_id = payload.get("community_id")
+        sender = payload.get("sender")
+        content = payload.get("content")
+        
+        # ID'yi int'e çevirerek karşılaştır (güvenlik için)
+        try:
+            comm_id = int(comm_id)
+        except:
+            pass
+
+        # Sadece kurucu mesaj atabilir
+        communities = community_repository.get_all_communities()
+        target_comm = next((c for c in communities if c["community_id"] == comm_id), None)
+        
+        if not target_comm:
+            print(f"[UYARI] Topluluk {comm_id} bulunamadı.")
+            return
+
+        if target_comm["creator"] != sender:
+            print(f"[UYARI] {sender} topluluk {comm_id} için yetkisiz mesaj denemesi yaptı. (Kurucu: {target_comm['creator']})")
+            return
+
+        # Mesajı kaydet (message_repository.save_message payload bekler)
+        msg_payload = {
+            "chat_id": target_comm["messages_file"].replace(".json", ""),
+            "sender": sender,
+            "content": content,
+            "timestamp": time.time(),
+            "message_id": int(time.time() * 1000)
+        }
+        save_message(msg_payload)
+        
+        # Üyelere ilet
+        members = target_comm.get("members", [])
+        broadcast_payload = {
+            "type": "community_message",
+            "payload": {
+                "community_id": comm_id,
+                "sender": sender,
+                "content": content,
+                "timestamp": time.time()
+            }
+        }
+        
+        for member in members:
+            if member in self.online_users:
+                self.send_packet(self.online_users[member], broadcast_payload)
+
+    def handle_create_community(self, conn, payload):
+        name = payload.get("name")
+        creator = payload.get("creator")
+        new_comm = community_repository.create_community(name, creator)
+        
+        # Mesaj dosyasını ilklendir
+        write_json("messages/" + new_comm["messages_file"], [])
+        
+        self.send_packet(conn, {
+            "type": "create_community_response",
+            "payload": {"status": "success", "community": new_comm}
+        })
+
+    def handle_join_community(self, conn, payload):
+        comm_id = payload.get("community_id")
+        username = payload.get("username")
+        success = community_repository.join_community(comm_id, username)
+        
+        self.send_packet(conn, {
+            "type": "join_community_response",
+            "payload": {"status": "success" if success else "fail", "community_id": comm_id}
+        })
+
+    def handle_search_communities(self, conn, payload):
+        query = payload.get("query")
+        results = community_repository.search_communities(query)
+        self.send_packet(conn, {
+            "type": "search_communities_response",
+            "payload": {"results": results}
+        })
+
+    def handle_get_user_communities(self, conn, payload):
+        username = payload.get("username")
+        user_comms = community_repository.get_user_communities(username)
+        
+        results = []
+        for comm in user_comms:
+            messages = get_messages(comm["messages_file"])
+            results.append({
+                "community_id": comm["community_id"],
+                "name": comm["name"],
+                "creator": comm["creator"],
+                "members": comm["members"],
+                "messages": messages[-50:]
+            })
+            
+        self.send_packet(conn, {
+            "type": "get_user_communities_response",
+            "payload": {"communities": results}
+        })

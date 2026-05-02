@@ -12,7 +12,9 @@ from controllers import LogRegController
 from controllers.chat_controller import ChatController
 from controllers.message_controller import MessageController
 from services.chatbot_service import ChatbotService
+from services.community_service import CommunityService
 from controllers.chatbot_controller import ChatbotController
+from controllers.community_controller import CommunityController
 
 
 class MainApplicationWindow(QMainWindow):
@@ -45,6 +47,7 @@ class MainApplicationWindow(QMainWindow):
         self.message_service = MessageService(self.chat_client)
         self.logreg_service = LogRegService(self.chat_client, chat_service=self.chat_service)
         self.block_service = BlockService(self.chat_client)
+        self.community_service = CommunityService(self.chat_client)
         self.encryption_service = EncryptionService(self.chat_client, keys_dir="keys")
 
         # 5. Servisleri client'a tanıt
@@ -53,6 +56,7 @@ class MainApplicationWindow(QMainWindow):
             'chat_service': self.chat_service,
             'message_service': self.message_service,
             'block_service': self.block_service,
+            'community_service': self.community_service,
             'encryption_service': self.encryption_service
         }
 
@@ -82,6 +86,7 @@ class MainApplicationWindow(QMainWindow):
             self.chatbot_service
         )
         self.chatbot_controller = ChatbotController(self.main_page, self.chatbot_service)
+        self.community_controller = CommunityController(self.main_page, self.community_service)
 
         # 7. Bağlan ve dinle
         if self.chat_client.connect():
@@ -128,6 +133,7 @@ class MainApplicationWindow(QMainWindow):
 
         self.chat_controller.set_current_user(user_info)
         self.message_controller.set_current_user(user_info)
+        self.community_controller.set_current_user(user_info)
 
         self.stacked_widget.setCurrentIndex(2)
         self.main_page.main_stack.setCurrentIndex(0)
