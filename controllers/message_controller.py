@@ -16,6 +16,7 @@ class MessageController:
 
         # UI sinyalleri
         self.main_page.send_message_signal.connect(self.handle_send_message)
+        self.main_page.send_image_signal.connect(self.handle_send_image)
         self.main_page.load_history_signal.connect(self.handle_chat_switched)
         self.main_page.typing_signal.connect(self.handle_typing)
         self.main_page.star_message_signal.connect(self.handle_star_message)
@@ -232,6 +233,95 @@ class MessageController:
             if not recipient_pub_key:
                 self.encryption_service.send_get_public_key_request(recipient)
 
+    def handle_send_image(self, chat_name: str, image_path: str):
+        """Resmi Base64'e çevirip gönderir."""
+        import base64
+        import os
+
+        if not os.path.exists(image_path):
+            print(f"[HATA] Resim dosyası bulunamadı: {image_path}")
+            return
+
+        try:
+            with open(image_path, "rb") as image_file:
+                image_data = image_file.read()
+                base64_image = base64.b64encode(image_data).decode("utf-8")
+        except Exception as e:
+            print(f"[HATA] Resim okunamadı: {e}")
+            return
+
+        # Chat ID ve grup bilgisini bul
+        actual_chat_id = None
+        is_group = False
+        for i in range(self.main_page.chat_screens_stack.count()):
+            widget = self.main_page.chat_screens_stack.widget(i)
+            if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                actual_chat_id = getattr(widget, 'current_chat_id', None)
+                is_group = getattr(widget, 'is_group', False)
+                break
+
+        if not actual_chat_id:
+            return
+
+        # E2EE kontrolü ve gönderim
+        if is_group and self.encryption_service:
+            widget_ref = None
+            for i in range(self.main_page.chat_screens_stack.count()):
+                w = self.main_page.chat_screens_stack.widget(i)
+                if hasattr(w, 'contact_name') and w.contact_name == chat_name:
+                    widget_ref = w
+                    break
+
+            members = getattr(widget_ref, 'members', []) if widget_ref else []
+            other_members = [m for m in members if m != self.current_username]
+
+            if self.encryption_service.all_group_keys_ready(other_members):
+                recipient_keys = {m: self.encryption_service.public_keys[m] for m in other_members}
+                recipient_keys[self.current_username] = self.encryption_service.get_public_key_pem()
+                # Base64 string'i metin gibi şifreliyoruz
+                encrypted_data = self.encryption_service.encrypt_message(base64_image, recipient_keys)
+                if encrypted_data:
+                    self.message_service.send_chat_message(
+                        chat_id=actual_chat_id,
+                        content="[Şifreli Resim]",
+                        sender_id=self.current_user_id or 1,
+                        sender=self.current_username or "",
+                        encrypted_data=encrypted_data,
+                        msg_type="image"
+                    )
+            return
+
+        if not self.encryption_service:
+            self.message_service.send_chat_message(
+                chat_id=actual_chat_id,
+                content=base64_image,
+                sender_id=self.current_user_id or 1,
+                sender=self.current_username or "",
+                msg_type="image"
+            )
+            return
+
+        # 1-1 sohbet: E2EE
+        recipient = chat_name
+        recipient_pub_key = self.encryption_service.public_keys.get(recipient)
+        my_pub_key = self.encryption_service.get_public_key_pem()
+
+        if recipient_pub_key and my_pub_key:
+            recipient_keys = {recipient: recipient_pub_key, self.current_username: my_pub_key}
+            encrypted_data = self.encryption_service.encrypt_message(base64_image, recipient_keys)
+            if encrypted_data:
+                self.message_service.send_chat_message(
+                    chat_id=actual_chat_id,
+                    content="[Şifreli Resim]",
+                    sender_id=self.current_user_id or 1,
+                    sender=self.current_username or "",
+                    encrypted_data=encrypted_data,
+                    msg_type="image"
+                )
+        else:
+            # Anahtar yoksa beklet (Şu anlık resim için bekletme yapmıyoruz ama eklenebilir)
+            print(f"[E2EE] {recipient} için anahtar yok, resim gönderilemedi.")
+
     def _on_public_key_fetched(self, data: dict):
         """Beklenen anahtar gelince bekleyen mesajları gönder."""
         username = data.get("username")
@@ -257,6 +347,7 @@ class MessageController:
         sender = payload.get("sender")
         status = payload.get("status", "delivered")
         message_id = payload.get("message_id")
+        msg_type = payload.get("msg_type", "text")
 
         is_mine = (sender == self.current_username)
 
@@ -325,7 +416,8 @@ class MessageController:
             read_by=actual_read_by,
             message_id=message_id,
             timestamp=payload.get("timestamp"),
-            sender_name=sender if (is_group and not is_mine) else None
+            sender_name=sender if (is_group and not is_mine) else None,
+            msg_type=msg_type
         )
 
         # 7. Okundu durumu
@@ -410,7 +502,8 @@ class MessageController:
                 message_id=msg_id,
                 timestamp=message.get("timestamp"),
                 sender_name=message.get("sender") if (is_group and not is_mine) else None,
-                is_starred = is_msg_starred
+                is_starred = is_msg_starred,
+                msg_type=message.get("msg_type", "text")
             )
 
         self.main_page.update_chat_unread_count(chat_name, unread_count)

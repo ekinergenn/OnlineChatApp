@@ -4,10 +4,10 @@ import time
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QHBoxLayout, QFrame, QScrollArea, QSizePolicy, QStackedWidget,
-    QMenu, QAction, QMessageBox
+    QMenu, QAction, QMessageBox, QFileDialog
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont, QCursor
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QByteArray
+from PyQt5.QtGui import QFont, QCursor, QPixmap, QImage
 from ui.communitiesPage import CommunitiesPageUI
 from ui.settingsPage import SettingsPageUI
 from ui.profilePage import ProfilePageUI
@@ -27,6 +27,7 @@ class MainPageUI(QWidget):
     delete_chat_signal = pyqtSignal(str)
     block_user_signal = pyqtSignal(str)
     send_message_signal = pyqtSignal(str, str)
+    send_image_signal = pyqtSignal(str, str)  # ← YENİ: (chat_name, image_path)
     load_history_signal = pyqtSignal(str)
     search_query_signal = pyqtSignal(str)
     start_chat_signal = pyqtSignal(str)
@@ -430,6 +431,12 @@ class MainPageUI(QWidget):
         send_btn.setCursor(QCursor(Qt.PointingHandCursor))
         send_btn.setStyleSheet("font-size: 20px; border: none; color: #3b82f6; background: transparent;")
 
+        attach_btn = QPushButton("📎")
+        attach_btn.setFixedSize(40, 40)
+        attach_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        attach_btn.setStyleSheet("font-size: 20px; border: none; color: #667781; background: transparent;")
+        attach_btn.clicked.connect(lambda: self.on_attach_clicked(contact_name))
+
         send_btn.clicked.connect(lambda: self.on_send_clicked(contact_name, msg_input))
         msg_input.returnPressed.connect(lambda: self.on_send_clicked(contact_name, msg_input))
 
@@ -438,6 +445,7 @@ class MainPageUI(QWidget):
             lambda text, cn=contact_name: self._on_input_changed(cn, text)
         )
 
+        bottom_layout.addWidget(attach_btn)
         bottom_layout.addWidget(msg_input)
         bottom_layout.addWidget(send_btn)
 
@@ -576,6 +584,13 @@ class MainPageUI(QWidget):
         self.chat_screens_stack.addWidget(new_chat_screen)
         self.chat_screens_stack.setCurrentIndex(new_stack_index)
 
+    def on_attach_clicked(self, chat_name):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Resim Seç", "", "Resim Dosyaları (*.png *.jpg *.jpeg *.gif *.bmp)"
+        )
+        if file_path:
+            self.send_image_signal.emit(chat_name, file_path)
+
     def on_send_clicked(self, chat_name, input_field):
         text = input_field.text().strip()
         if text:  # Boş mesaj gitmesin
@@ -584,7 +599,7 @@ class MainPageUI(QWidget):
             # Gönderince yazmayı durdur
             self._on_typing_stopped(chat_name)
 
-    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None, timestamp=None, sender_name=None, is_starred=False):
+    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None, timestamp=None, sender_name=None, is_starred=False, msg_type="text"):
         if read_by is None:
             read_by = []
 
@@ -617,7 +632,8 @@ class MainPageUI(QWidget):
                     sender_name=display_sender,  # Sadece görsel için
                     message_id=message_id,
                     is_starred=is_starred,
-                    real_data_sender=data_sender
+                    real_data_sender=data_sender,
+                    msg_type=msg_type
                 )
                 msg_layout.addWidget(bubble)
 
@@ -635,9 +651,9 @@ class MainPageUI(QWidget):
                 )
                 break
 
-        self.update_chat_last_message(chat_name, content, is_mine)
+        self.update_chat_last_message(chat_name, content, is_mine, msg_type=msg_type)
 
-    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None, timestamp=None, sender_name=None, real_data_sender=None ,message_id=None, is_starred=False):
+    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None, timestamp=None, sender_name=None, real_data_sender=None ,message_id=None, is_starred=False, msg_type="text"):
         if read_by is None:
             read_by = []
 
@@ -694,6 +710,33 @@ class MainPageUI(QWidget):
         """)
         text_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
         text_label.setMinimumHeight(0)
+
+        image_label = None
+        if msg_type == "image":
+            import base64
+            try:
+                image_label = QLabel()
+                image_label.setAlignment(Qt.AlignCenter)
+                
+                # Base64 -> QPixmap
+                img_data = base64.b64decode(content)
+                pixmap = QPixmap()
+                pixmap.loadFromData(img_data)
+                
+                # Boyutu sınırla
+                scaled_pixmap = pixmap.scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                image_label.setPixmap(scaled_pixmap)
+                image_label.setStyleSheet("border-radius: 4px; background: transparent;")
+                
+                # Eğer şifreli değilse (veya çözülmüşse) ve content Base64 ise text_label'ı gizle
+                # Ancak [Şifreli Resim] gibi placeholder'ları göstermek isteyebiliriz.
+                if content.startswith("[") and content.endswith("]"):
+                    pass # Placeholder'ı göster
+                else:
+                    text_label.setVisible(False)
+            except Exception as e:
+                print(f"[UI HATA] Resim yüklenemedi: {e}")
+                image_label = None
 
         time_label = QLabel(time_str)
         time_label.setStyleSheet("""
@@ -768,6 +811,8 @@ class MainPageUI(QWidget):
             text_label.setMaximumWidth(bubble_width - 20)
             bubble_frame.setFixedWidth(bubble_width)
 
+        if image_label:
+            bubble_layout.addWidget(image_label)
         bubble_layout.addWidget(text_label)
 
         bottom_row = QHBoxLayout()
@@ -1017,9 +1062,13 @@ class MainPageUI(QWidget):
         self.search_input.clear()
         self.switch_to_chat(chat_name)
 
-    def update_chat_last_message(self, chat_name, content, is_mine):
+    def update_chat_last_message(self, chat_name, content, is_mine, msg_type="text"):
         prefix = "Sen: " if is_mine else ""
-        display_text = f"{prefix}{content}"
+        
+        if msg_type == "image":
+            display_text = f"{prefix}📷 Fotoğraf"
+        else:
+            display_text = f"{prefix}{content}"
 
         for i in range(self.scroll_layout.count()):
             item = self.scroll_layout.itemAt(i)

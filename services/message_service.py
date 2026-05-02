@@ -13,11 +13,12 @@ class MessageService(QObject):
         super().__init__()
         self.client = client
 
-    def send_chat_message(self, chat_id: str, content: str, sender_id: int, sender: str = "", encrypted_data: dict = None):
+    def send_chat_message(self, chat_id: str, content: str, sender_id: int, sender: str = "", encrypted_data: dict = None, msg_type: str = "text"):
         payload = {
             "message_id": uuid.uuid4().hex,
             "chat_id": chat_id,
             "content": content,
+            "msg_type": msg_type,
             "sender_id": sender_id,
             "sender": sender,
             "timestamp": int(time.time()),
