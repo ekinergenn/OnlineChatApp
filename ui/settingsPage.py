@@ -41,8 +41,9 @@ class ModernSwitch(QAbstractButton):
         super().mouseReleaseEvent(event)
         self.update()  # Rengi ve konumu güncellemek için
 
+
 class SettingsPageUI(QWidget):
-    def __init__(self,main_page, parent=None):
+    def __init__(self, main_page, parent=None):
         super().__init__(parent)
         self.main_page_ref = main_page
         self.init_ui()
@@ -78,13 +79,14 @@ class SettingsPageUI(QWidget):
         self.scroll_layout.setAlignment(Qt.AlignTop)
 
         # butonlar
-        self.yildiz_btn = self.create_setting_button("🌟", "Yıldızlı Mesajlar", "Yıldızladığın mesajlarını görüntüle, düzenle.", 1)
+        self.yildiz_btn = self.create_setting_button("🌟", "Yıldızlı Mesajlar",
+                                                     "Yıldızladığın mesajlarını görüntüle, düzenle.", 1)
         self.scroll_layout.addWidget(self.yildiz_btn)
         self.gizlilik_btn = self.create_setting_button("🔐", "Gizlilik", "Engellenen kişiler, çevrimiçi bilgisi...", 2)
         self.scroll_layout.addWidget(self.gizlilik_btn)
         self.bildirimler_btn = self.create_setting_button("🔔", "Bildirimler", "Mesaj sesleri ve grup uyarıları", 3)
         self.scroll_layout.addWidget(self.bildirimler_btn)
-        self.tema = self.create_theme_toggle("🌓", "Karanlık Mod", "Gözlerinizi dinlendirin") #indexi 4
+        self.tema = self.create_theme_toggle("🌓", "Karanlık Mod", "Gözlerinizi dinlendirin")  # indexi 4
         self.scroll_layout.addWidget(self.tema)
         self.yardim_btn = self.create_setting_button("❓", "Yardım", "Yardım merkezi, bize ulaşın", 5)
         self.scroll_layout.addWidget(self.yardim_btn)
@@ -104,7 +106,8 @@ class SettingsPageUI(QWidget):
         self.details_stack.addWidget(self.starred_page)
 
         # Diğer boş sayfalar (2, 3, 4, 5)
-        self.details_stack.addWidget(self.create_empty_detail_page("Gizlilik", "Gizlilik ayarları yakında burada."))
+        self.privacy_page = self.create_privacy_page()
+        self.details_stack.addWidget(self.privacy_page)
         self.details_stack.addWidget(self.create_empty_detail_page("Bildirimler", "Bildirim ayarları yakında burada."))
         self.details_stack.addWidget(self.create_empty_detail_page("Görünüm", "Karanlık mod ayarları aktif."))
         self.details_stack.addWidget(self.create_empty_detail_page("Yardım", "Yardım merkezi yakında burada."))
@@ -127,7 +130,7 @@ class SettingsPageUI(QWidget):
         return page
 
     def create_starred_page(self):
-        #yıldızlı mesajların listeleneceği sayfa
+        # yıldızlı mesajların listeleneceği sayfa
         page = QFrame()
         page.setStyleSheet("background-color: #f0f2f5;")
         layout = QVBoxLayout(page)
@@ -156,6 +159,166 @@ class SettingsPageUI(QWidget):
         self.starred_scroll.setWidget(self.starred_container)
         layout.addWidget(self.starred_scroll)
         return page
+
+    def create_privacy_toggle(self, icon, title, subtitle):
+        frame = QFrame()
+        frame.setFixedHeight(85)
+        frame.setStyleSheet("""
+            QFrame { background-color: #ffffff; border: 1px solid #f0f2f5; border-radius: 12px; }
+        """)
+
+        layout = QHBoxLayout(frame)
+        layout.setContentsMargins(15, 0, 15, 0)
+
+        icon_lbl = QLabel(icon)
+        icon_lbl.setStyleSheet("font-size: 20px; border: none; background: transparent;")
+
+        text_container = QWidget()
+        text_container.setStyleSheet("background: transparent; border: none;")
+        v_layout = QVBoxLayout(text_container)
+        v_layout.setContentsMargins(0, 0, 0, 0)
+        v_layout.setSpacing(2)
+
+        t_lbl = QLabel(title)
+        t_lbl.setStyleSheet("font-size: 16px; font-weight: 500; color: #111b21; border: none;")
+        st_lbl = QLabel(subtitle)
+        st_lbl.setStyleSheet("font-size: 13px; color: #667781; border: none;")
+
+        v_layout.addWidget(t_lbl)
+        v_layout.addWidget(st_lbl)
+
+        switch = ModernSwitch()
+
+        layout.addWidget(icon_lbl)
+        layout.addWidget(text_container)
+        layout.addStretch()
+        layout.addWidget(switch)
+
+        return frame, switch
+
+    def create_privacy_page(self):
+        page = QFrame()
+        page.setStyleSheet("background-color: #f0f2f5;")
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        header = QFrame()
+        header.setFixedHeight(65)
+        header.setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #d1d7db;")
+        h_layout = QHBoxLayout(header)
+        h_layout.addWidget(
+            QLabel("Gizlilik Ayarları", styleSheet="font-size: 18px; font-weight: bold; color: #111b21;"))
+        layout.addWidget(header)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("border: none; background: transparent;")
+
+        container = QWidget()
+        v_layout = QVBoxLayout(container)
+        v_layout.setContentsMargins(20, 20, 20, 20)
+        v_layout.setSpacing(12)
+        v_layout.setAlignment(Qt.AlignTop)
+
+        frame1, self.switch_online = self.create_privacy_toggle("🟢", "Çevrimiçi Görünürlüğü",
+                                                                "Çevrimiçi olduğunuzu diğer kullanıcılar görebilir.")
+        frame2, self.switch_last_seen = self.create_privacy_toggle("🕒", "Son Görülme",
+                                                                   "Son görülme zamanınızı diğer kullanıcılar görebilir.")
+        frame3, self.switch_read_receipts = self.create_privacy_toggle("✔", "Okundu Bilgisi",
+                                                                       "Mesajları okuduğunuzda karşı tarafa mavi tik gider.")
+
+        self.switch_online.setChecked(True)
+        self.switch_last_seen.setChecked(True)
+        self.switch_read_receipts.setChecked(True)
+
+        self.switch_online.toggled.connect(self._on_privacy_changed)
+        self.switch_last_seen.toggled.connect(self._on_privacy_changed)
+        self.switch_read_receipts.toggled.connect(self._on_privacy_changed)
+
+        v_layout.addWidget(frame1)
+        v_layout.addWidget(frame2)
+        v_layout.addWidget(frame3)
+
+        blocked_header = QLabel("Engellenen Kişiler")
+        blocked_header.setStyleSheet(
+            "font-size: 16px; font-weight: bold; color: #111b21; margin-top: 15px; margin-bottom: 5px;")
+        v_layout.addWidget(blocked_header)
+
+        self.blocked_list_layout = QVBoxLayout()
+        self.blocked_list_layout.setContentsMargins(0, 0, 0, 0)
+        self.blocked_list_layout.setSpacing(5)
+        v_layout.addLayout(self.blocked_list_layout)
+
+        scroll.setWidget(container)
+        layout.addWidget(scroll)
+        return page
+
+    def _on_privacy_changed(self, checked=None):
+        settings = {
+            "online_status": self.switch_online.isChecked(),
+            "last_seen": self.switch_last_seen.isChecked(),
+            "read_receipts": self.switch_read_receipts.isChecked()
+        }
+        if hasattr(self.main_page_ref, 'update_privacy_settings_signal'):
+            self.main_page_ref.update_privacy_settings_signal.emit(settings)
+
+    def load_blocked_users(self, blocked_users_list):
+        while self.blocked_list_layout.count() > 0:
+            item = self.blocked_list_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        if not blocked_users_list:
+            lbl = QLabel("Engellenen kişi bulunmuyor.")
+            lbl.setStyleSheet("color: #667781; font-size: 13px; background: transparent; border: none;")
+            self.blocked_list_layout.addWidget(lbl)
+            return
+
+        for user_data in blocked_users_list:
+            card = QFrame()
+            card.setFixedHeight(60)
+            card.setStyleSheet("background-color: #ffffff; border: 1px solid #f0f2f5; border-radius: 8px;")
+            card_layout = QHBoxLayout(card)
+            card_layout.setContentsMargins(15, 0, 15, 0)
+
+            name_lbl = QLabel(user_data.get('blocked_username', 'Bilinmeyen'))
+            name_lbl.setStyleSheet("font-size: 15px; font-weight: 500; color: #111b21; border: none;")
+
+            unblock_btn = QPushButton("Engellemeyi Kaldır")
+            unblock_btn.setCursor(QCursor(Qt.PointingHandCursor))
+            unblock_btn.setStyleSheet("""
+                QPushButton { background-color: #f0f2f5; color: #ef4444; border: none; border-radius: 6px; padding: 5px 10px; font-weight: bold; }
+                QPushButton:hover { background-color: #fee2e2; }
+            """)
+
+            def make_unblock_handler(b_id):
+                return lambda: self.unblock_user_action(b_id)
+
+            unblock_btn.clicked.connect(make_unblock_handler(user_data.get('blocked_id')))
+
+            card_layout.addWidget(name_lbl)
+            card_layout.addStretch()
+            card_layout.addWidget(unblock_btn)
+
+            self.blocked_list_layout.addWidget(card)
+
+    def unblock_user_action(self, blocked_id):
+        if hasattr(self.main_page_ref, 'unblock_user_from_settings_signal'):
+            self.main_page_ref.unblock_user_from_settings_signal.emit(str(blocked_id))
+
+    def load_privacy_settings(self, settings):
+        self.switch_online.blockSignals(True)
+        self.switch_last_seen.blockSignals(True)
+        self.switch_read_receipts.blockSignals(True)
+
+        self.switch_online.setChecked(settings.get("online_status", True))
+        self.switch_last_seen.setChecked(settings.get("last_seen", True))
+        self.switch_read_receipts.setChecked(settings.get("read_receipts", True))
+
+        self.switch_online.blockSignals(False)
+        self.switch_last_seen.blockSignals(False)
+        self.switch_read_receipts.blockSignals(False)
 
     def create_setting_button(self, icon, title, subtitle, index):
         btn = QPushButton()
@@ -211,6 +374,9 @@ class SettingsPageUI(QWidget):
                     self.main_page_ref.get_starred_messages_signal.emit(username)
                 else:
                     print(">>> HATA: Kullanıcı adı (None) veya Sinyal bulunamadı!")
+            elif index == 2:
+                if hasattr(self.main_page_ref, 'request_blocked_users_signal'):
+                    self.main_page_ref.request_blocked_users_signal.emit()
 
         btn.clicked.connect(on_click)
         return btn
@@ -279,7 +445,7 @@ class SettingsPageUI(QWidget):
         return page
 
     def add_starred_message_card(self, star_data):
-        #listeye kart ekler
+        # listeye kart ekler
         card = QFrame()
         card.setMinimumHeight(80)
         card.setStyleSheet("""
@@ -337,7 +503,7 @@ class SettingsPageUI(QWidget):
         self.starred_container.adjustSize()
 
     def clear_starred_list(self):
-        #yıldızlı mesajlar listesindeki tüm kartları temizle
+        # yıldızlı mesajlar listesindeki tüm kartları temizle
         while self.starred_list_layout.count() > 0:
             item = self.starred_list_layout.takeAt(0)
             widget = item.widget()
@@ -346,7 +512,7 @@ class SettingsPageUI(QWidget):
         self.starred_container.adjustSize()
 
     def clear_all_data(self):
-        #oturum kapatıldığında tüm yıldızlı mesaj kartlarını temizle
+        # oturum kapatıldığında tüm yıldızlı mesaj kartlarını temizle
         while self.starred_list_layout.count() > 0:
             item = self.starred_list_layout.takeAt(0)
             widget = item.widget()

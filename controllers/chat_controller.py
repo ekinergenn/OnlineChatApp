@@ -1,8 +1,9 @@
 from PyQt5.QtWidgets import QMessageBox
 from services.block_service import BlockService
 
+
 class ChatController():
-    def __init__(self, main_page, chat_service, message_controller, block_service = None, chatbot_service = None):
+    def __init__(self, main_page, chat_service, message_controller, block_service=None, chatbot_service=None):
         self.block_service = block_service
         self.main_page = main_page
         self.chat_service = chat_service
@@ -29,7 +30,10 @@ class ChatController():
         self.chat_service.user_status_signal.connect(self.on_user_status_received)
         if self.block_service:
             self.block_service.block_status_changed_signal.connect(self.on_block_status_received)
+            self.block_service.block_list_loaded_signal.connect(self.on_block_list_loaded)
         self.chat_service.all_users_loaded_signal.connect(self.on_all_users_loaded)
+        self.main_page.request_blocked_users_signal.connect(self.handle_request_blocked_users)
+        self.main_page.unblock_user_from_settings_signal.connect(self.handle_unblock_from_settings)
         self.chat_service.create_group_response_signal.connect(self.on_group_created)
         self.main_page.request_all_users_signal.connect(self.handle_request_all_users)
         self.main_page.create_group_signal.connect(self.handle_create_group)
@@ -61,7 +65,7 @@ class ChatController():
     def set_current_user(self, profile: dict):
         self.current_user_id = profile.get("user_id")
         self.current_username = profile.get("username")
-        
+
         self.chat_service.send_get_user_chats_request(self.current_username)
 
     def on_user_status_received(self, payload: dict):
@@ -72,12 +76,11 @@ class ChatController():
 
         self.main_page.update_chat_status_bar(username, status, last_seen_ts)
 
-
     def on_block_status_received(self, payload: dict):
         # Sunucudan gelen block yanıtını işle
         blocked_id = payload.get("blocked_id")
         is_blocked = payload.get("is_blocked")
-        
+
         # UI'daki tüm açık sohbetleri tara ve bu kullanıcıya aitse güncelle
         for i in range(self.main_page.chat_screens_stack.count()):
             widget = self.main_page.chat_screens_stack.widget(i)
@@ -93,7 +96,7 @@ class ChatController():
             if getattr(widget, 'contact_name', None) == contact_name:
                 target_widget = widget
                 break
-        
+
         if not target_widget: return
         receiver_id = getattr(target_widget, 'other_user_id', None)
         if not receiver_id:
@@ -101,7 +104,7 @@ class ChatController():
             return
 
         is_currently_blocked = (target_widget.block_action.text() == "🔓 Engeli Kaldır")
-        
+
         if is_currently_blocked:
             # Engel kaldır
             self.block_service.send_unblock_user_request(self.current_user_id, receiver_id)
@@ -111,6 +114,21 @@ class ChatController():
                                          QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.Yes:
                 self.block_service.send_block_user_request(self.current_user_id, receiver_id)
+
+    def handle_request_blocked_users(self):
+        if self.block_service and self.current_user_id:
+            self.block_service.send_get_block_list_request(self.current_user_id)
+
+    def on_block_list_loaded(self, blocks: list):
+        if hasattr(self.main_page, 'settings_page'):
+            self.main_page.settings_page.load_blocked_users(blocks)
+
+    def handle_unblock_from_settings(self, blocked_id_str):
+        if self.block_service and self.current_user_id:
+            self.block_service.send_unblock_user_request(self.current_user_id, int(blocked_id_str))
+            # Also request updated list
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(200, self.handle_request_blocked_users)
 
     def update_block_ui_elements(self, contact_name, is_blocked):
         for i in range(self.main_page.chat_screens_stack.count()):
@@ -123,13 +141,13 @@ class ChatController():
 
     def load_user_chats(self, chats: list):
         for chat in chats:
-            chat_id    = chat.get("chat_id")
-            chat_name  = chat.get("chat_name", chat_id)
-            messages   = chat.get("messages", [])
+            chat_id = chat.get("chat_id")
+            chat_name = chat.get("chat_name", chat_id)
+            messages = chat.get("messages", [])
             other_user_id = chat.get("other_user_id")
-            block_status  = chat.get("block_status", "none")
-            is_group      = chat.get("is_group", False)
-            members       = chat.get("members", [])  # Grup üyeleri
+            block_status = chat.get("block_status", "none")
+            is_group = chat.get("is_group", False)
+            members = chat.get("members", [])  # Grup üyeleri
 
             # Arayüze sohbet kartını ekle
             self.main_page.add_new_chat_to_ui(chat_name, is_group=is_group)
@@ -180,13 +198,13 @@ class ChatController():
         if payload.get("status") == "success":
             chat_id = payload.get("chat_id")
             target_name = payload.get("target_username")
-            
+
             self.main_page.add_new_chat_to_ui(target_name)
-            
+
             for i in range(self.main_page.chat_screens_stack.count()):
                 widget = self.main_page.chat_screens_stack.widget(i)
                 if hasattr(widget, 'contact_name') and widget.contact_name == target_name:
-                    widget.current_chat_id = chat_id 
+                    widget.current_chat_id = chat_id
                     break
 
     # TAMAMEN YENİ FONKSİYON

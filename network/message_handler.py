@@ -1,5 +1,6 @@
 from network.protocol import Protocol
 
+
 class MessageHandler:
     def __init__(self, services):
         self.services = services
@@ -13,7 +14,7 @@ class MessageHandler:
 
         if msg_type == "chat_message":
             self.services['message_service'].receive_new_message(payload)
-            
+
         elif msg_type == "messages_read_receipt":
             self.services['message_service'].receive_messages_read_receipt(payload)
 
@@ -40,7 +41,7 @@ class MessageHandler:
 
         elif msg_type == "get_user_chats_response":
             self.services['chat_service'].handle_get_user_chats_response(payload)
-            
+
         elif msg_type == "create_chat_response":
             self.services['chat_service'].handle_create_chat_response(payload)
 
@@ -82,6 +83,13 @@ class MessageHandler:
             print(">>> HANDLER: Sunucudan yıldız kaldırma yanıtı geldi.")
             if 'message_service' in self.services:
                 self.services['message_service'].unstar_response_signal.emit(payload)
+
+        elif msg_type == "get_privacy_settings_response":
+            if 'message_service' in self.services:
+                self.services['message_service'].privacy_settings_loaded_signal.emit(payload.get("settings", {}))
+
+        elif msg_type == "update_privacy_settings_response":
+            print(f"[İSTEMCİ] Gizlilik ayarları güncelleme onayı: {payload.get('status')}")
 
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")

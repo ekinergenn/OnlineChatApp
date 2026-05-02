@@ -23,6 +23,7 @@ class MessageController:
         self.main_page.star_message_signal.connect(self.handle_star_message)
         self.main_page.get_starred_messages_signal.connect(self.message_service.send_get_starred_messages)
         self.main_page.unstar_from_settings_signal.connect(self.message_service.send_unstar_request)
+        self.main_page.update_privacy_settings_signal.connect(lambda settings: self.message_service.send_update_privacy_settings(self.current_username, settings))
 
         # Servis sinyalleri
         self.message_service.receive_message_signal.connect(self.on_message_received)
@@ -30,6 +31,7 @@ class MessageController:
         self.message_service.typing_indicator_signal.connect(self.on_typing_indicator_received)
         self.message_service.starred_messages_loaded_signal.connect(self.handle_starred_messages_response)
         self.message_service.unstar_response_signal.connect(self.handle_unstar_response)
+        self.message_service.privacy_settings_loaded_signal.connect(self.main_page.settings_page.load_privacy_settings)
 
         # E2EE: Anahtar hazır olduğunda bekleyen mesajları gönder
         if self.encryption_service:
@@ -132,6 +134,7 @@ class MessageController:
         self.current_user_id = profile.get("user_id")
         self.current_username = profile.get("username")
         self.message_service.send_get_starred_messages(self.current_username)
+        self.message_service.send_get_privacy_settings(self.current_username)
 
     def reset_user_data(self):
         """Oturum kapatıldığında state'i temizler."""

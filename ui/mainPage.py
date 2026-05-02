@@ -12,6 +12,7 @@ from ui.communitiesPage import CommunitiesPageUI
 from ui.settingsPage import SettingsPageUI
 from ui.profilePage import ProfilePageUI
 
+
 # Tıklanabilir sohbet listesi elemanları için özel QFrame sınıfı
 class ClickableFrame(QFrame):
     clicked = pyqtSignal()
@@ -37,10 +38,14 @@ class MainPageUI(QWidget):
     star_message_signal = pyqtSignal(dict)
     get_starred_messages_signal = pyqtSignal(str)
     unstar_from_settings_signal = pyqtSignal(dict)
+    update_privacy_settings_signal = pyqtSignal(dict)
+    get_privacy_settings_signal = pyqtSignal(str)
+    request_blocked_users_signal = pyqtSignal()
+    unblock_user_from_settings_signal = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
-        self.current_username=None
+        self.current_username = None
         self._typing_timers = {}
         self.init_ui()
 
@@ -73,7 +78,7 @@ class MainPageUI(QWidget):
         self.communities_page = CommunitiesPageUI(self)
         self.main_stack.addWidget(self.communities_page)
 
-        #sayfa 3: ayarlar index 2
+        # sayfa 3: ayarlar index 2
         self.settings_page = SettingsPageUI(main_page=self)
         self.main_stack.addWidget(self.settings_page)
 
@@ -124,7 +129,7 @@ class MainPageUI(QWidget):
         self.main_layout.addWidget(nav_frame)
 
     def switch_to_settings_reset(self):
-        #ayarlar sayfasına geçer ve detay panelini sıfırlar
+        # ayarlar sayfasına geçer ve detay panelini sıfırlar
         self.main_stack.setCurrentIndex(2)  # Ayarlar sayfası indeksi
         if hasattr(self, 'settings_page'):
             self.settings_page.details_stack.setCurrentIndex(0)
@@ -264,7 +269,8 @@ class MainPageUI(QWidget):
             badge = QLabel(str(unread_count))
             badge.setFixedSize(20, 20)
             badge.setAlignment(Qt.AlignCenter)
-            badge.setStyleSheet("background-color: #3b82f6; color: white; border-radius: 10px; font-size: 11px; font-weight: bold;")
+            badge.setStyleSheet(
+                "background-color: #3b82f6; color: white; border-radius: 10px; font-size: 11px; font-weight: bold;")
             info_layout.addWidget(time_label)
             info_layout.addWidget(badge, alignment=Qt.AlignRight)
             item_frame.badge_label = badge
@@ -599,7 +605,8 @@ class MainPageUI(QWidget):
             # Gönderince yazmayı durdur
             self._on_typing_stopped(chat_name)
 
-    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None, timestamp=None, sender_name=None, is_starred=False, msg_type="text"):
+    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None,
+                          timestamp=None, sender_name=None, is_starred=False, msg_type="text"):
         if read_by is None:
             read_by = []
 
@@ -653,7 +660,9 @@ class MainPageUI(QWidget):
 
         self.update_chat_last_message(chat_name, content, is_mine, msg_type=msg_type)
 
-    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None, timestamp=None, sender_name=None, real_data_sender=None ,message_id=None, is_starred=False, msg_type="text"):
+    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None, timestamp=None,
+                               sender_name=None, real_data_sender=None, message_id=None, is_starred=False,
+                               msg_type="text"):
         if read_by is None:
             read_by = []
 
@@ -717,21 +726,21 @@ class MainPageUI(QWidget):
             try:
                 image_label = QLabel()
                 image_label.setAlignment(Qt.AlignCenter)
-                
+
                 # Base64 -> QPixmap
                 img_data = base64.b64decode(content)
                 pixmap = QPixmap()
                 pixmap.loadFromData(img_data)
-                
+
                 # Boyutu sınırla
                 scaled_pixmap = pixmap.scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 image_label.setPixmap(scaled_pixmap)
                 image_label.setStyleSheet("border-radius: 4px; background: transparent;")
-                
+
                 # Eğer şifreli değilse (veya çözülmüşse) ve content Base64 ise text_label'ı gizle
                 # Ancak [Şifreli Resim] gibi placeholder'ları göstermek isteyebiliriz.
                 if content.startswith("[") and content.endswith("]"):
-                    pass # Placeholder'ı göster
+                    pass  # Placeholder'ı göster
                 else:
                     text_label.setVisible(False)
             except Exception as e:
@@ -1039,7 +1048,7 @@ class MainPageUI(QWidget):
         return item_frame
 
     def _add_existing_group_back(self, group_data):
-        #kullanıcının zaten üyesi olduğu grubu sol listeye geri getir
+        # kullanıcının zaten üyesi olduğu grubu sol listeye geri getir
         chat_name = group_data.get("chat_name")
         chat_id = group_data.get("chat_id")
 
@@ -1064,7 +1073,7 @@ class MainPageUI(QWidget):
 
     def update_chat_last_message(self, chat_name, content, is_mine, msg_type="text"):
         prefix = "Sen: " if is_mine else ""
-        
+
         if msg_type == "image":
             display_text = f"{prefix}📷 Fotoğraf"
         else:
@@ -1110,7 +1119,8 @@ class MainPageUI(QWidget):
                         badge = QLabel(str(count))
                         badge.setFixedSize(20, 20)
                         badge.setAlignment(Qt.AlignCenter)
-                        badge.setStyleSheet("background-color: #3b82f6; color: white; border-radius: 10px; font-size: 11px; font-weight: bold;")
+                        badge.setStyleSheet(
+                            "background-color: #3b82f6; color: white; border-radius: 10px; font-size: 11px; font-weight: bold;")
                         widget.info_layout.addWidget(badge, alignment=Qt.AlignRight)
                         widget.badge_label = badge
                     else:
@@ -1392,7 +1402,6 @@ class MainPageUI(QWidget):
             self.settings_page.clear_all_data()
 
         print("[UI] Tüm arayüz bileşenleri sıfırlandı.")
-
 
 
 if __name__ == "__main__":

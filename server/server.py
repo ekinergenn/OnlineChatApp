@@ -3,7 +3,8 @@ import threading
 import json
 import time
 import os
-from database.user_repository import find_user, create_user, search_users, delete_user, update_public_key, get_public_key
+from database.user_repository import find_user, create_user, search_users, delete_user, update_public_key, \
+    get_public_key, get_privacy_settings, update_privacy_settings
 from database.message_repository import save_message, get_messages, mark_messages_as_read
 from database.chat_repository import create_chat, get_all_chats, get_chat_, get_user_chats, delete_chat, MESSAGES_DIR
 from database import block_repository
@@ -28,7 +29,7 @@ class ChatServer:
             client_sock, addr = self.server_socket.accept()
             print(f"[BAĞLANTI] {addr} bağlandı.")
             self.clients.append(client_sock)
-            
+
             thread = threading.Thread(target=self.handle_client, args=(client_sock, addr))
             thread.start()
 
@@ -43,11 +44,11 @@ class ChatServer:
 
                 # 2. Protokolüne uygun olarak veriyi tamponda biriktir ve parçala
                 buffer += raw_data.decode('utf-8')
-                
+
                 while "<END>" in buffer:
                     msg, buffer = buffer.split("<END>", 1)
                     if not msg: continue
-                    
+
                     try:
                         packet = json.loads(msg)
                         print(f"[GELEN PAKET] {addr}: {packet}")
@@ -61,7 +62,7 @@ class ChatServer:
                 break
 
         print(f"[AYRILDI] {addr} bağlantısı kesildi.")
-        
+
         # Online kullanıcılardan temizle
         user_to_remove = None
         for username, socket in self.online_users.items():
@@ -82,6 +83,14 @@ class ChatServer:
 
     def _broadcast_status(self, username, status, last_seen_ts=None):
         """İlgili kullanıcının durumunu sohbet ettiği herkese bildirir."""
+        from database.user_repository import get_privacy_settings
+        privacy = get_privacy_settings(username)
+
+        if not privacy.get("online_status", True):
+            status = "offline"
+        if not privacy.get("last_seen", True):
+            last_seen_ts = None
+
         all_chats = get_all_chats()
         notified = set()
 
@@ -103,14 +112,14 @@ class ChatServer:
     def process_request(self, conn, packet):
         """İstemcinin gönderdiği 'type' değerine göre cevap üretir."""
         msg_type = packet.get("type")
-        
+
         # Senin logReg_service içindeki paket yapına uygun kontrol
         if msg_type == "login_request":
             payload = packet.get("payload", {})
             username = payload.get("name")
             password = payload.get("password")
 
-            user=find_user(username)
+            user = find_user(username)
             if user and user["password"] == password:
                 # KRİTİK: Aynı soket önceki oturumlarda başka kullanıcılara atanmış olabilir.
                 # Önce bu sokete bağlı tüm eski kullanıcıları temizle.
@@ -125,12 +134,12 @@ class ChatServer:
                     "type": "login_response",
                     "payload": {
                         "status": "success",
-                        "profile":{
-                        "username":user["username"],
-                        "fullname": user["fullname"],
-                        "email": user["email"],
-                        "tel": user["tel"],
-                        "user_id": user["user_id"]
+                        "profile": {
+                            "username": user["username"],
+                            "fullname": user["fullname"],
+                            "email": user["email"],
+                            "tel": user["tel"],
+                            "user_id": user["user_id"]
                         }
                     }
                 }
@@ -167,17 +176,17 @@ class ChatServer:
             payload = packet.get("payload", {})
             chat_id = payload.get("chat_id")
             sender_name = payload.get("sender")
-            
+
             all_chats = get_all_chats()
             active_chat = get_chat_(all_chats, chat_id)
-            
+
             # SECURITY CHECK
             if active_chat and (sender_name in active_chat["members"]):
                 # BLOCK CHECK
                 # Find receiver(s)
                 receivers = [m for m in active_chat["members"] if m != sender_name]
                 sender_user = find_user(sender_name)
-                
+
                 can_send = True
                 if sender_user:
                     sender_id = sender_user.get("user_id")
@@ -189,7 +198,7 @@ class ChatServer:
                             if status != "none":
                                 can_send = False
                                 break
-                
+
                 if not can_send:
                     response = {
                         "type": "error",
@@ -199,7 +208,7 @@ class ChatServer:
                     return
 
                 saved_message = save_message(payload)
-                
+
                 # Forward to online members
                 for member in active_chat["members"]:
                     if member in self.online_users:
@@ -234,8 +243,16 @@ class ChatServer:
             payload = packet.get("payload", {})
             target_username = payload.get("username")
 
+            from database.user_repository import get_privacy_settings
+            privacy = get_privacy_settings(target_username)
+
             is_online = target_username in self.online_users
+            if not privacy.get("online_status", True):
+                is_online = False
+
             last_seen_ts = self.last_seen.get(target_username)
+            if not privacy.get("last_seen", True):
+                last_seen_ts = None
 
             self.send_packet(conn, {
                 "type": "get_user_status_response",
@@ -255,23 +272,55 @@ class ChatServer:
 
             if chat_id and message_ids and username:
                 mark_messages_as_read(chat_id, message_ids, username)
-                
+
                 # İsteğe bağlı olarak diğer üyelere ilet (Okundu bilgisinin canlı güncellenmesi için)
-                all_chats = get_all_chats()
-                active_chat = get_chat_(all_chats, chat_id)
-                if active_chat:
-                    for member in active_chat["members"]:
-                        if member != username and member in self.online_users:
-                            member_socket = self.online_users[member]
-                            response_packet = {
-                                "type": "messages_read_receipt",
-                                "payload": {
-                                    "chat_id": chat_id,
-                                    "message_ids": message_ids,
-                                    "read_by": username
+                from database.user_repository import get_privacy_settings
+                privacy = get_privacy_settings(username)
+                if privacy.get("read_receipts", True):
+                    all_chats = get_all_chats()
+                    active_chat = get_chat_(all_chats, chat_id)
+                    if active_chat:
+                        for member in active_chat["members"]:
+                            if member != username and member in self.online_users:
+                                member_socket = self.online_users[member]
+                                response_packet = {
+                                    "type": "messages_read_receipt",
+                                    "payload": {
+                                        "chat_id": chat_id,
+                                        "message_ids": message_ids,
+                                        "read_by": username
+                                    }
                                 }
-                            }
-                            self.send_packet(member_socket, response_packet)
+                                self.send_packet(member_socket, response_packet)
+
+        elif msg_type == "get_privacy_settings_request":
+            payload = packet.get("payload", {})
+            username = payload.get("username")
+            from database.user_repository import get_privacy_settings
+            settings = get_privacy_settings(username)
+            self.send_packet(conn, {
+                "type": "get_privacy_settings_response",
+                "payload": {"username": username, "settings": settings}
+            })
+
+        elif msg_type == "update_privacy_settings_request":
+            payload = packet.get("payload", {})
+            username = payload.get("username")
+            settings = payload.get("settings", {})
+            from database.user_repository import update_privacy_settings
+            success = update_privacy_settings(username, settings)
+            self.send_packet(conn, {
+                "type": "update_privacy_settings_response",
+                "payload": {"status": "success" if success else "fail"}
+            })
+
+            # Anında durumu yayınla (eğer çevrimiçi kapandıysa offline göndersin)
+            if "online_status" in settings:
+                if settings["online_status"]:
+                    if username in self.online_users:
+                        self._broadcast_status(username, "online")
+                else:
+                    self._broadcast_status(username, "offline", self.last_seen.get(username))
 
         elif msg_type == "get_user_chats_request":
             payload = packet.get("payload", {})
@@ -280,9 +329,24 @@ class ChatServer:
             user_chats = get_user_chats(username)
             all_chats = get_all_chats()
             packet_data = []
-            
+
+            from database.user_repository import get_privacy_settings
+            privacy_cache = {}
+
             for chat_id in user_chats:
                 chat_messages = get_messages(chat_id)
+
+                # Apply read_receipts privacy
+                for msg in chat_messages:
+                    filtered_read_by = []
+                    for reader in msg.get("read_by", []):
+                        if reader not in privacy_cache:
+                            privacy_cache[reader] = get_privacy_settings(reader).get("read_receipts", True)
+
+                        if reader == username or privacy_cache[reader]:
+                            filtered_read_by.append(reader)
+                    msg["read_by"] = filtered_read_by
+
                 chat_obj = get_chat_(all_chats, chat_id)
                 display_name = chat_id
 
@@ -303,7 +367,8 @@ class ChatServer:
                     other_member_name = [m for m in chat_obj.get("members", []) if m != username][0]
                     other_user = find_user(other_member_name)
                     if other_user:
-                        block_status = block_repository.check_block_status(sender_user.get("user_id"), other_user.get("user_id"))
+                        block_status = block_repository.check_block_status(sender_user.get("user_id"),
+                                                                           other_user.get("user_id"))
 
                 packet_data.append({
                     "chat_id": chat_id,
@@ -327,19 +392,19 @@ class ChatServer:
         elif msg_type == "create_chat_request":
             payload = packet.get("payload", {})
             members = payload.get("members", [])
-            
+
             import time
             new_chat_id = f"chat_{int(time.time())}"
 
             try:
                 # 1. Sohbet listesine (chats.json) ekle[cite: 6]
                 create_chat(new_chat_id, members, is_group=False)
-                
+
                 # 2. KRİTİK ADIM: Mesaj dosyasını (messages/chat_id.json) o an oluştur
                 # Boş bir liste yazarak dosyanın varlığını garantiliyoruz
                 from database.db import write_json
                 write_json(f"messages/{new_chat_id}.json", [])
-                
+
                 # 3. Yanıtı gönder
                 response = {
                     "type": "create_chat_response",
@@ -421,9 +486,9 @@ class ChatServer:
             payload = packet.get("payload", {})
             blocker_id = payload.get("blocker_id")
             blocked_id = payload.get("blocked_id")
-            
+
             block_repository.add_or_update_block(blocker_id, blocked_id, status=True)
-            
+
             response = {
                 "type": "block_user_response",
                 "payload": {"status": "success", "blocker_id": blocker_id, "blocked_id": blocked_id, "is_blocked": True}
@@ -434,22 +499,37 @@ class ChatServer:
             payload = packet.get("payload", {})
             blocker_id = payload.get("blocker_id")
             blocked_id = payload.get("blocked_id")
-            
+
             block_repository.add_or_update_block(blocker_id, blocked_id, status=False)
-            
+
             response = {
                 "type": "block_user_response",
-                "payload": {"status": "success", "blocker_id": blocker_id, "blocked_id": blocked_id, "is_blocked": False}
+                "payload": {"status": "success", "blocker_id": blocker_id, "blocked_id": blocked_id,
+                            "is_blocked": False}
             }
             self.send_packet(conn, response)
 
         elif msg_type == "get_block_list_request":
             payload = packet.get("payload", {})
             user_id = payload.get("user_id")
-            
+
             all_blocks = block_repository.get_all_blocks()
-            user_blocks = [b for b in all_blocks if str(b.get("blocker_id")) == str(user_id) and b.get("isBlocked")]
-            
+            from database.user_repository import get_all_users
+            all_users = get_all_users()
+            user_dict = {str(u["user_id"]): u["username"] for u in all_users}
+
+            user_blocks = []
+            for b in all_blocks:
+                if str(b.get("blocker_id")) == str(user_id) and b.get("isBlocked"):
+                    blocked_id_str = str(b.get("blocked_id"))
+                    blocked_username = user_dict.get(blocked_id_str, "Bilinmeyen Kullanıcı")
+                    user_blocks.append({
+                        "blocker_id": b.get("blocker_id"),
+                        "blocked_id": b.get("blocked_id"),
+                        "blocked_username": blocked_username,
+                        "isBlocked": b.get("isBlocked")
+                    })
+
             response = {
                 "type": "get_block_list_response",
                 "payload": {"status": "success", "blocks": user_blocks}
@@ -621,7 +701,7 @@ class ChatServer:
         #         # 2. Veritabanına (chats.json) kaydet[cite: 6]
         #         # is_group=False çünkü bu bir birebir sohbet
         #         create_chat(new_chat_id, members, is_group=False)
-                
+
         #         # 3. İsteği gönderen kişiye yanıt dön
         #         response = {
         #             "type": "create_chat_response",

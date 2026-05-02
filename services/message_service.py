@@ -8,6 +8,7 @@ class MessageService(QObject):
     typing_indicator_signal = pyqtSignal(dict)
     starred_messages_loaded_signal = pyqtSignal(list)
     unstar_response_signal = pyqtSignal(dict)
+    privacy_settings_loaded_signal = pyqtSignal(dict)
 
     def __init__(self, client):
         super().__init__()
@@ -103,3 +104,17 @@ class MessageService(QObject):
         messages = payload.get("messages", [])
         print(f">>> SERVICE: Sinyal emit ediliyor. Mesaj sayısı: {len(messages)}")
         self.starred_messages_loaded_signal.emit(messages)
+
+    def send_get_privacy_settings(self, username: str):
+        packet = {
+            "type": "get_privacy_settings_request",
+            "payload": {"username": username}
+        }
+        self.client.send_data(packet)
+
+    def send_update_privacy_settings(self, username: str, settings: dict):
+        packet = {
+            "type": "update_privacy_settings_request",
+            "payload": {"username": username, "settings": settings}
+        }
+        self.client.send_data(packet)
