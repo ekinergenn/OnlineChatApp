@@ -857,15 +857,14 @@ class MainPageUI(QWidget):
         if not message_id: return
 
         try:
-            # 1. Görsel Değişim
-            if button_widget.text() == "☆":
-                button_widget.setText("⭐")
-                button_widget.setStyleSheet("color: #eab308; border: none; background: transparent; font-size: 16px;")
-                action = "star"
-            else:
-                button_widget.setText("☆")
-                button_widget.setStyleSheet("color: #8696a0; border: none; background: transparent; font-size: 16px;")
-                action = "unstar"
+            # Eğer zaten yıldızlıysa hiçbir şey yapma
+            if button_widget.text() == "⭐":
+                return
+
+            # Sadece yıldızlama yap (tek yönlü)
+            button_widget.setText("⭐")
+            button_widget.setStyleSheet("color: #eab308; border: none; background: transparent; font-size: 16px;")
+            action = "star"
 
             # 2. Giriş yapan asıl kullanıcıyı bul (starred_by için)
             current_user = self.current_username
