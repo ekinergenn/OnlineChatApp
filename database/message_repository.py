@@ -9,7 +9,7 @@ def get_messages(chat_id: str) -> list:
     return read_json(file_path)
 
 def save_message(payload) -> dict:
-    chat_id = payload.get("chat_id")
+    chat_id = str(payload.get("chat_id"))
     # 1. Mevcut mesajları ÇEK
     all_messages = get_messages(chat_id)
     

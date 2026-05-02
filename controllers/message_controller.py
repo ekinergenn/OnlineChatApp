@@ -51,6 +51,7 @@ class MessageController:
         self.message_service.send_get_starred_messages(username)
 
     def handle_starred_messages_response(self, messages):
+        self.user_starred_ids = {str(msg['message_id']) for msg in messages}
         user_log = getattr(self, 'current_username', 'Bilinmeyen Kullanıcı')
         print(f">>> CONTROLLER: {user_log} için yanıt işleniyor...")
         """Sunucudan gelen listeyi SettingsPage arayüzüne basar."""
@@ -75,15 +76,47 @@ class MessageController:
         self.main_page.settings_page.starred_scroll.update()
         print("[DEBUG] Kartlar eklendi ve arayüz tazelendi.")
 
+        print(f"[DEBUG] {len(self.user_starred_ids)} mesaj ID'si sarı görünmek üzere işaretlendi.")
+
+        # açık olan chat'i yeniden yükle (yıldızları göstermek için)
+        current_widget = self.main_page.chat_screens_stack.currentWidget()
+
+        if hasattr(current_widget, 'contact_name') and hasattr(current_widget, 'current_chat_id'):
+            chat_name = current_widget.contact_name
+            chat_id = current_widget.current_chat_id
+            messages_data = getattr(current_widget, 'messages_data', [])
+
+            if messages_data:
+                print("[FIX] Chat yeniden yükleniyor (yıldızlar için)")
+
+                # önce ekranı temizle
+                layout = current_widget.msg_layout
+                while layout.count() > 1:
+                    item = layout.takeAt(0)
+                    if item.widget():
+                        item.widget().deleteLater()
+
+                # tekrar yükle
+                self.load_historical_messages(chat_name, chat_id, messages_data)
+
     def handle_star_message(self, star_data):
         # Kullanıcı adını controller'daki mevcut kullanıcıdan alıp ekliyoruz
         star_data["starred_by"] = self.current_username
         print(f"[DEBUG] Sunucuya yıldız isteği gidiyor: {star_data}")
         self.message_service.send_star_message(star_data)
+        if not hasattr(self, 'user_starred_ids'):
+            self.user_starred_ids = set()
+
+        msg_id = str(star_data.get("message_id"))
+        if star_data.get("action") == "star":
+            self.user_starred_ids.add(msg_id)
+        else:
+            self.user_starred_ids.discard(msg_id)
 
     def set_current_user(self, profile: dict):
         self.current_user_id = profile.get("user_id")
         self.current_username = profile.get("username")
+        self.message_service.send_get_starred_messages(self.current_username)
 
     def reset_user_data(self):
         """Oturum kapatıldığında state'i temizler."""
@@ -346,7 +379,7 @@ class MessageController:
         content = payload.get("content")
         sender = payload.get("sender")
         status = payload.get("status", "delivered")
-        message_id = payload.get("message_id")
+        message_id = str(payload.get("message_id"))
         msg_type = payload.get("msg_type", "text")
 
         is_mine = (sender == self.current_username)
@@ -410,6 +443,9 @@ class MessageController:
                 is_group = getattr(w, 'is_group', False)
                 break
 
+        starred_ids = getattr(self, 'user_starred_ids', set())
+        is_msg_starred = message_id in starred_ids
+
         # 6. UI'a ekle (duplicate kontrolü mainPage içinde yapılıyor)
         self.main_page.add_message_to_ui(
             chat_name, content, is_mine, status,
@@ -417,6 +453,7 @@ class MessageController:
             message_id=message_id,
             timestamp=payload.get("timestamp"),
             sender_name=sender if (is_group and not is_mine) else None,
+            is_starred=is_msg_starred,
             msg_type=msg_type
         )
 
@@ -448,7 +485,7 @@ class MessageController:
     # ───────────────────────── GEÇMİŞ MESAJLAR ───────────────────────────────
 
     def load_historical_messages(self, chat_name: str, chat_id: str, messages: list):
-        starred_ids = set()
+        starred_ids = getattr(self, 'user_starred_ids', set())
         try:
             # 'starred_container' içindeki kartları dolaşarak ID'leri toplayan bir yardımcı metod
             for i in range(self.main_page.settings_page.starred_list_layout.count()):
@@ -466,19 +503,14 @@ class MessageController:
             w = self.main_page.chat_screens_stack.widget(i)
             if getattr(w, 'contact_name', None) == chat_name:
                 is_group = getattr(w, 'is_group', False)
-                break
-
-        for i in range(self.main_page.chat_screens_stack.count()):
-            widget = self.main_page.chat_screens_stack.widget(i)
-            if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
-                widget.current_chat_id = chat_id
-                widget.messages_data = messages
+                w.current_chat_id = chat_id
+                w.messages_data = messages
                 break
 
         unread_count = 0
         for message in messages:
             sender = message.get("sender")
-            msg_id = message.get("message_id")
+            msg_id = str(message.get("message_id"))  # Karşılaştırma için string garantisi
             is_mine = (sender == self.current_username)
 
             if not is_mine and self.current_username not in message.get("read_by", []):
@@ -539,12 +571,17 @@ class MessageController:
     def on_messages_read_receipt(self, payload: dict):
         chat_id = payload.get("chat_id")
         message_ids = payload.get("message_ids", [])
+        reader = payload.get("read_by", "")
 
-        chat_name = chat_id
+        chat_name = None
         for i in range(self.main_page.chat_screens_stack.count()):
             widget = self.main_page.chat_screens_stack.widget(i)
-            if getattr(widget, 'current_chat_id', None) == chat_id:
-                chat_name = getattr(widget, 'contact_name', chat_id)
-                break
 
-        self.main_page.update_message_read_status(chat_name, message_ids, payload.get("read_by", ""))
+            id_match = getattr(widget, 'current_chat_id', None) == chat_id
+            name_match = (not getattr(widget, 'is_group', False)) and (getattr(widget, 'contact_name', None) == reader)
+
+            if id_match or name_match:
+                chat_name = getattr(widget, 'contact_name', chat_id)
+                # Sadece mavi tıkları güncelle, yıldız durumuna dokunma
+                self.main_page.update_message_read_status(chat_name, message_ids, reader)
+                break

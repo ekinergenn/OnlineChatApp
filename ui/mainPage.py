@@ -879,7 +879,7 @@ class MainPageUI(QWidget):
 
             # 4. Veriyi paketle
             star_data = {
-                "message_id": message_id,
+                "message_id": str(message_id),
                 "content": content,
                 "sender": real_sender,
                 "chat_name": getattr(self.chat_screens_stack.currentWidget(), 'contact_name', 'Bilinmiyor'),
@@ -1131,12 +1131,12 @@ class MainPageUI(QWidget):
         # İlgili mesajların tikini mavi yapar
         for i in range(self.chat_screens_stack.count()):
             widget = self.chat_screens_stack.widget(i)
-            if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+            if getattr(widget, 'contact_name', None) == chat_name:
                 for msg_id in message_ids:
-                    status_label = widget.message_status_labels.get(msg_id)
-                    if status_label:
-                        status_label.setText("✓✓")
-                        status_label.setStyleSheet("color: #3b82f6; font-size: 11px; font-weight: bold;")
+                    label = widget.message_status_labels.get(str(msg_id))
+                    if label:
+                        label.setText("✓✓")
+                        label.setStyleSheet("color: #3b82f6; font-size: 11px; font-weight: bold;")
                 break
 
     def create_chatbot_item(self):
