@@ -48,13 +48,18 @@ class MainApplicationWindow(QMainWindow):
         self.encryption_service = EncryptionService(self.chat_client, keys_dir="keys")
 
         # 5. Servisleri client'a tanıt
-        self.chat_client.register_services({
+        services_dict = {
             'logreg_service': self.logreg_service,
             'chat_service': self.chat_service,
             'message_service': self.message_service,
             'block_service': self.block_service,
             'encryption_service': self.encryption_service
-        })
+        }
+
+        self.chat_client.register_services(services_dict)
+
+        from network.message_handler import MessageHandler
+        self.chat_client.message_handler = MessageHandler(services_dict)
 
         # 6. Controller'lar
         self.auth_controller = LogRegController(
@@ -110,6 +115,9 @@ class MainApplicationWindow(QMainWindow):
         """Login başarılı olunca çağrılır."""
         self.current_user = user_info  # {"user_id": 1, "username": "nisa", ...}
         username = user_info.get("username", "")
+
+        self.main_page.current_username = username
+        print(f"[DEBUG] MainPageUI current_username set edildi: {username}")
 
         self.main_page.reset_ui()
 

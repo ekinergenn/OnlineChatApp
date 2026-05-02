@@ -1,5 +1,6 @@
 import datetime
 import sys
+import time
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QHBoxLayout, QFrame, QScrollArea, QSizePolicy, QStackedWidget,
@@ -32,9 +33,13 @@ class MainPageUI(QWidget):
     create_group_signal = pyqtSignal(str, list)  # (group_name, [members])
     request_all_users_signal = pyqtSignal()  # + butonuna basınca sunucudan kullanıcı listesi iste
     typing_signal = pyqtSignal(str, bool)  # ← YENİ: (chat_name, is_typing)
+    star_message_signal = pyqtSignal(dict)
+    get_starred_messages_signal = pyqtSignal(str)
+    unstar_from_settings_signal = pyqtSignal(dict)
 
     def __init__(self):
         super().__init__()
+        self.current_username=None
         self._typing_timers = {}
         self.init_ui()
 
@@ -56,11 +61,11 @@ class MainPageUI(QWidget):
         self.chats_page_layout = QHBoxLayout(self.chats_page)
         self.chats_page_layout.setContentsMargins(0, 0, 0, 0)
         self.chats_page_layout.setSpacing(0)
-        
+
         # Sohbetler sayfası için alt elemanları oluştur
         self.create_chat_list_panel()
         self.create_chat_screens_stack()
-        
+
         self.main_stack.addWidget(self.chats_page)
 
         # Sayfa 2: Topluluklar Sayfası (Örnek Boş Sayfa) index 1
@@ -68,7 +73,7 @@ class MainPageUI(QWidget):
         self.main_stack.addWidget(self.communities_page)
 
         #sayfa 3: ayarlar index 2
-        self.settings_page = SettingsPageUI(self)
+        self.settings_page = SettingsPageUI(main_page=self)
         self.main_stack.addWidget(self.settings_page)
 
         # Sayfa 4: Profil Sayfası index 3
@@ -189,7 +194,7 @@ class MainPageUI(QWidget):
 
         ]
 
-        # StackWidget'taki indeksler 0 (Hoşgeldin) ile başlayacağı için, 
+        # StackWidget'taki indeksler 0 (Hoşgeldin) ile başlayacağı için,
         # ilk sohbetin indeksi 1, ikincisinin 2 olacak.
         for index, (name, msg, time, unread) in enumerate(self.dummy_chats, start=1):
             chat_item = self.create_chat_item(name, msg, time, unread, index)
@@ -265,7 +270,7 @@ class MainPageUI(QWidget):
         layout.addLayout(text_layout)
         layout.addStretch()
         layout.addLayout(info_layout)
-        
+
         item_frame.msg_label = msg_label
         item_frame.time_label = time_label
         item_frame.info_layout = info_layout
@@ -573,13 +578,14 @@ class MainPageUI(QWidget):
             # Gönderince yazmayı durdur
             self._on_typing_stopped(chat_name)
 
-    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None, timestamp=None, sender_name=None):
+    def add_message_to_ui(self, chat_name, content, is_mine=True, status="delivered", read_by=None, message_id=None, timestamp=None, sender_name=None, is_starred=False):
         if read_by is None:
             read_by = []
 
         for i in range(self.chat_screens_stack.count()):
             widget = self.chat_screens_stack.widget(i)
             if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+
                 # Duplicate mesaj kontrolü
                 if message_id and message_id in getattr(widget, 'displayed_message_ids', set()):
                     break  # Zaten eklendi, tekrar ekleme
@@ -589,7 +595,24 @@ class MainPageUI(QWidget):
 
                 stretch_item = msg_layout.takeAt(msg_layout.count() - 1)
 
-                bubble, status_label = self._create_message_bubble(content, is_mine, status, read_by, timestamp, sender_name)
+                if is_mine:
+                    # Mesaj benimse: JSON'a gidecek isim kendi ismim, arayüzde görünecek isim None
+                    data_sender = self.current_username
+                    display_sender = None
+                else:
+                    is_group = getattr(widget, 'is_group', False)
+                    # JSON'a gidecek isim: Eğer grup değilse chat_name, grup ise gelen sender_name
+                    data_sender = sender_name if (is_group and sender_name) else chat_name
+                    # Arayüzde görünecek isim: Sadece gruplarda isim yazsın
+                    display_sender = data_sender if is_group else None
+
+                bubble, status_label = self._create_message_bubble(
+                    content, is_mine, status, read_by, timestamp,
+                    sender_name=display_sender,  # Sadece görsel için
+                    message_id=message_id,
+                    is_starred=is_starred,
+                    real_data_sender=data_sender
+                )
                 msg_layout.addWidget(bubble)
 
                 msg_layout.addStretch()
@@ -608,7 +631,7 @@ class MainPageUI(QWidget):
 
         self.update_chat_last_message(chat_name, content, is_mine)
 
-    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None, timestamp=None, sender_name=None):
+    def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None, timestamp=None, sender_name=None, real_data_sender=None ,message_id=None, is_starred=False):
         if read_by is None:
             read_by = []
 
@@ -746,10 +769,26 @@ class MainPageUI(QWidget):
         bottom_row.setSpacing(3)
 
         bottom_row.addStretch()
-        bottom_row.addWidget(time_label)
 
+        initial_text = "⭐" if is_starred else "☆"
+        initial_color = "#eab308" if is_starred else "#8696a0"
+
+        star_btn = QPushButton(initial_text)
+        star_btn.setFixedSize(16, 16)
+        star_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        star_btn.setStyleSheet(
+            f"QPushButton {{ border: none; background: transparent; color: {initial_color}; font-size: 14px; }}")
+        star_btn.setVisible(True)
+
+        star_btn.clicked.connect(
+            lambda checked=False, mid=message_id, cont=content, sdr=real_data_sender, btn=star_btn:
+            self._handle_star_click(mid, cont, sdr, btn)
+        )
+
+        bottom_row.addWidget(star_btn)
         if is_mine and status_label is not None:
             bottom_row.addWidget(status_label)
+        bottom_row.addWidget(time_label)
 
         bubble_layout.addLayout(bottom_row)
 
@@ -761,6 +800,51 @@ class MainPageUI(QWidget):
             w_layout.addStretch()
 
         return wrapper, status_label
+
+    def _handle_star_click(self, message_id, content, sender, button_widget):
+        if not message_id: return
+
+        try:
+            # 1. Görsel Değişim
+            if button_widget.text() == "☆":
+                button_widget.setText("⭐")
+                button_widget.setStyleSheet("color: #eab308; border: none; background: transparent; font-size: 16px;")
+                action = "star"
+            else:
+                button_widget.setText("☆")
+                button_widget.setStyleSheet("color: #8696a0; border: none; background: transparent; font-size: 16px;")
+                action = "unstar"
+
+            # 2. Giriş yapan asıl kullanıcıyı bul (starred_by için)
+            current_user = self.current_username
+
+            main_win = self.window()
+
+            # 3. Mesajı gönderen ismini belirle
+            if sender == "Siz" or not sender:
+                real_sender = current_user
+            else:
+                real_sender = sender
+
+            # 4. Veriyi paketle
+            star_data = {
+                "message_id": message_id,
+                "content": content,
+                "sender": real_sender,
+                "chat_name": getattr(self.chat_screens_stack.currentWidget(), 'contact_name', 'Bilinmiyor'),
+                "action": action,
+                "timestamp": int(time.time()),
+                "starred_by": current_user
+            }
+
+            print(f"[DEBUG] Sunucuya giden veri: Sender={real_sender}, StarredBy={current_user}")
+
+            # 5. Debug ve Emit
+            print(f"[DEBUG] Sinyal gönderiliyor: {star_data}")
+            self.star_message_signal.emit(star_data)
+
+        except Exception as e:
+            print(f"[HATA] Yıldızlama sırasında bir sorun oluştu: {e}")
 
     def create_chat_screens_stack(self):
         self.chat_screens_stack = QStackedWidget()

@@ -42,8 +42,9 @@ class ModernSwitch(QAbstractButton):
         self.update()  # Rengi ve konumu güncellemek için
 
 class SettingsPageUI(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self,main_page, parent=None):
         super().__init__(parent)
+        self.main_page_ref = main_page
         self.init_ui()
 
     def init_ui(self):
@@ -95,49 +96,66 @@ class SettingsPageUI(QWidget):
         # --- 3. SÜTUN: AYAR DETAYLARI (StackedWidget) ---
         self.details_stack = QStackedWidget()
 
-        # İNDEKS 0: AYARLAR HOŞ GELDİN EKRANI (Fonksiyon kullanmadan doğrudan oluşturma)
-        settings_welcome = QFrame()
-        settings_welcome.setStyleSheet("background-color: #f0f2f5;")  # Sağ panel arka planı
-        welcome_layout = QVBoxLayout(settings_welcome)
-        welcome_layout.addStretch()
+        # İndeks 0: Hoş Geldin
+        self.details_stack.addWidget(self.create_welcome_page())
 
-        # İkon
-        big_settings_icon = QLabel("⚙️")
-        big_settings_icon.setStyleSheet("font-size: 80px; color: #667781;")
-        big_settings_icon.setAlignment(Qt.AlignCenter)
-        welcome_layout.addWidget(big_settings_icon)
+        # İndeks 1: YILDIZLI MESAJLAR (Asıl sayfa)
+        self.starred_page = self.create_starred_page()
+        self.details_stack.addWidget(self.starred_page)
 
-        # Başlık
-        s_title = QLabel("Uygulama Ayarları")
-        s_title.setStyleSheet("font-size: 28px; color: #111b21; font-weight: 300; margin-top: 20px;")
-        s_title.setAlignment(Qt.AlignCenter)
-        welcome_layout.addWidget(s_title)
-
-        # Alt Başlık
-        s_subtitle = QLabel("Hesabınızı, bildirimlerinizi ve görünüm<br>tercihlerinizi buradan yönetebilirsiniz.")
-        s_subtitle.setStyleSheet("font-size: 14px; color: #667781; line-height: 1.5; margin-top: 10px;")
-        s_subtitle.setAlignment(Qt.AlignCenter)
-        welcome_layout.addWidget(s_subtitle)
-
-        welcome_layout.addStretch()
-
-        # Alt Not
-        s_info_note = QLabel("🛠️ Değişiklikler otomatik olarak kaydedilir")
-        s_info_note.setStyleSheet("font-size: 12px; color: #8696a0; margin-bottom: 20px;")
-        s_info_note.setAlignment(Qt.AlignCenter)
-        welcome_layout.addWidget(s_info_note)
-
-        # Stack'e ilk sayfa olarak ekle
-        self.details_stack.addWidget(settings_welcome)
-
-        # (Bundan sonra diğer detay sayfalarını eklemeye devam edebilirsin)
-        self.layout.addWidget(self.details_stack)
-
-        # Diğer detay sayfaları (Örnek olarak boş sayfalar ekliyoruz)
-        for i in range(5):
-            self.details_stack.addWidget(self.create_empty_detail_page("Ayar Detayı", f"Bu bölüm yakında eklenecek..."))
+        # Diğer boş sayfalar (2, 3, 4, 5)
+        self.details_stack.addWidget(self.create_empty_detail_page("Gizlilik", "Gizlilik ayarları yakında burada."))
+        self.details_stack.addWidget(self.create_empty_detail_page("Bildirimler", "Bildirim ayarları yakında burada."))
+        self.details_stack.addWidget(self.create_empty_detail_page("Görünüm", "Karanlık mod ayarları aktif."))
+        self.details_stack.addWidget(self.create_empty_detail_page("Yardım", "Yardım merkezi yakında burada."))
 
         self.layout.addWidget(self.details_stack)
+
+    def create_welcome_page(self):
+        page = QFrame()
+        page.setStyleSheet("background-color: #f0f2f5;")
+        layout = QVBoxLayout(page)
+        layout.setAlignment(Qt.AlignCenter)
+        icon = QLabel("⚙️")
+        icon.setStyleSheet("font-size: 80px; color: #667781;")
+        title = QLabel("Uygulama Ayarları")
+        title.setStyleSheet("font-size: 24px; color: #111b21; font-weight: 300;")
+        layout.addStretch()
+        layout.addWidget(icon, alignment=Qt.AlignCenter)
+        layout.addWidget(title, alignment=Qt.AlignCenter)
+        layout.addStretch()
+        return page
+
+    def create_starred_page(self):
+        #yıldızlı mesajların listeleneceği sayfa
+        page = QFrame()
+        page.setStyleSheet("background-color: #f0f2f5;")
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Üst Bilgi
+        header = QFrame()
+        header.setFixedHeight(65)
+        header.setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #d1d7db;")
+        h_layout = QHBoxLayout(header)
+        h_layout.addWidget(
+            QLabel("Yıldızlı Mesajlar", styleSheet="font-size: 18px; font-weight: bold; color: #111b21;"))
+        layout.addWidget(header)
+
+        # Liste Alanı
+        self.starred_scroll = QScrollArea()
+        self.starred_scroll.setWidgetResizable(True)
+        self.starred_scroll.setStyleSheet("border: none; background: transparent;")
+
+        self.starred_container = QWidget()
+        self.starred_list_layout = QVBoxLayout(self.starred_container)
+        self.starred_list_layout.setContentsMargins(20, 20, 20, 20)
+        self.starred_list_layout.setSpacing(12)
+        self.starred_list_layout.setAlignment(Qt.AlignTop)
+
+        self.starred_scroll.setWidget(self.starred_container)
+        layout.addWidget(self.starred_scroll)
+        return page
 
     def create_setting_button(self, icon, title, subtitle, index):
         btn = QPushButton()
@@ -173,9 +191,28 @@ class SettingsPageUI(QWidget):
         btn_layout.addWidget(text_container)
         btn_layout.addStretch()
 
-        # Tıklama aksiyonu: Sağdaki stack'i değiştir
-        btn.clicked.connect(lambda: self.details_stack.setCurrentIndex(index))
+        def on_click():
+            self.details_stack.setCurrentIndex(index)
+            if index == 1:
+                username = getattr(self.main_page_ref, 'current_username', None)
 
+                print(f">>> UI: Yıldızlı mesajlar isteği. Kullanıcı: {username}")
+                if not username:
+                    main_win = self.window()
+                    if hasattr(main_win, 'current_user') and main_win.current_user:
+                        username = main_win.current_user.get("username")
+                        # Bulduysan main_page'e geri yaz ki bir daha uğraşma
+                        self.main_page_ref.current_username = username
+
+                print(f">>> UI: Yıldızlı mesajlar isteği. Kullanıcı: {username}")
+
+                if username and hasattr(self.main_page_ref, 'get_starred_messages_signal'):
+                    print(">>> UI: Sinyal fırlatılıyor...")
+                    self.main_page_ref.get_starred_messages_signal.emit(username)
+                else:
+                    print(">>> HATA: Kullanıcı adı (None) veya Sinyal bulunamadı!")
+
+        btn.clicked.connect(on_click)
         return btn
 
     def create_theme_toggle(self, icon, title, subtitle):
@@ -240,3 +277,49 @@ class SettingsPageUI(QWidget):
         layout.addWidget(title, alignment=Qt.AlignCenter)
         layout.addWidget(desc, alignment=Qt.AlignCenter)
         return page
+
+    def add_starred_message_card(self, star_data):
+        #listeye kart ekler
+        card = QFrame()
+        card.setMinimumHeight(80)
+        card.setStyleSheet("""
+            QFrame { 
+                background-color: #ffffff; 
+                border-radius: 8px; 
+                border: 1px solid #e9edef; 
+            }
+            QFrame:hover { border: 1px solid #3b82f6; }
+        """)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(15, 10, 15, 10)
+        layout.setSpacing(5)
+
+        # Üst Satır
+        top = QHBoxLayout()
+        sender_name = star_data.get('sender', 'Bilinmiyor')
+        sender_lbl = QLabel(f"👤 {sender_name}")
+        sender_lbl.setStyleSheet("font-weight: bold; color: #3b82f6; border: none;")
+
+        chat_lbl = QLabel(f"📍 {star_data.get('chat_name', 'Sohbet')}")
+        chat_lbl.setStyleSheet("font-size: 11px; color: #8696a0; border: none;")
+
+        top.addWidget(sender_lbl)
+        top.addStretch()
+        top.addWidget(chat_lbl)
+
+        # Mesaj İçeriği
+        content_lbl = QLabel(star_data.get('content', ''))
+        content_lbl.setWordWrap(True)
+        content_lbl.setStyleSheet("color: #111b21; font-size: 13px; border: none; background: transparent;")
+
+        bottom = QHBoxLayout()
+        bottom.addStretch()
+
+        layout.addLayout(top)
+        layout.addWidget(content_lbl)
+        layout.addLayout(bottom)
+
+        # Container'a (starred_list_layout) ekle
+        self.starred_list_layout.insertWidget(0, card)
+        card.show()
+        self.starred_container.adjustSize()

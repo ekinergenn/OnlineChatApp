@@ -5,6 +5,7 @@ class MessageHandler:
         self.services = services
 
     def handle_incoming_data(self, raw_str: str):
+        print(f"[HANDLER DEBUG] Ham veri geldi: {raw_str[:50]}...")
         packet = Protocol.parse_packet(raw_str)
         msg_type = packet.get("type")
         payload = packet.get("payload")
@@ -68,6 +69,14 @@ class MessageHandler:
         elif msg_type == "get_public_key_response":
             if 'encryption_service' in self.services:
                 self.services['encryption_service'].handle_get_public_key_response(payload)
+
+        elif msg_type == "get_starred_messages_response":
+            print(">>> HANDLER: Sunucudan yıldızlı mesajlar PAKETİ GELDİ!")
+            if 'message_service' in self.services:
+                self.services['message_service'].handle_get_starred_messages_response(payload)
+
+        elif msg_type == "star_message_response":
+            print(f"[İSTEMCİ] Yıldızlama onayı: {payload.get('status')}")
 
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")

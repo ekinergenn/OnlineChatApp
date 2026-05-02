@@ -23,10 +23,48 @@ class MessageController:
         self.message_service.receive_message_signal.connect(self.on_message_received)
         self.message_service.messages_read_receipt_signal.connect(self.on_messages_read_receipt)
         self.message_service.typing_indicator_signal.connect(self.on_typing_indicator_received)
+        self.main_page.star_message_signal.connect(self.handle_star_message)
+        self.main_page.get_starred_messages_signal.connect(self.message_service.send_get_starred_messages)
+        self.message_service.starred_messages_loaded_signal.connect(self.handle_starred_messages_response)
 
         # E2EE: Anahtar hazır olduğunda bekleyen mesajları gönder
         if self.encryption_service:
             self.encryption_service.public_key_fetched_signal.connect(self._on_public_key_fetched)
+
+    def handle_get_starred_messages(self, username):
+        print(f">>> CONTROLLER: {username} için sunucuya istek paketi gönderiliyor...")
+        self.message_service.send_get_starred_messages(username)
+
+    def handle_starred_messages_response(self, messages):
+        user_log = getattr(self, 'current_username', 'Bilinmeyen Kullanıcı')
+        print(f">>> CONTROLLER: {user_log} için yanıt işleniyor...")
+        """Sunucudan gelen listeyi SettingsPage arayüzüne basar."""
+        print(f"[DEBUG] Sunucudan {len(messages)} adet mesaj geldi. Arayüze basılıyor...")
+
+        # 1. Önce mevcut kartları temizle
+        while self.main_page.settings_page.starred_list_layout.count() > 0:
+            item = self.main_page.settings_page.starred_list_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        # 2. Yeni kartları ekle
+        if not messages:
+            print("[DEBUG] Gösterilecek yıldızlı mesaj bulunamadı.")
+            return
+
+        for msg_data in messages:
+            self.main_page.settings_page.add_starred_message_card(msg_data)
+
+        # arayüzü güncellenmeye zorla
+        self.main_page.settings_page.starred_container.adjustSize()
+        self.main_page.settings_page.starred_scroll.update()
+        print("[DEBUG] Kartlar eklendi ve arayüz tazelendi.")
+
+    def handle_star_message(self, star_data):
+        # Kullanıcı adını controller'daki mevcut kullanıcıdan alıp ekliyoruz
+        star_data["starred_by"] = self.current_username
+        print(f"[DEBUG] Sunucuya yıldız isteği gidiyor: {star_data}")
+        self.message_service.send_star_message(star_data)
 
     def set_current_user(self, profile: dict):
         self.current_user_id = profile.get("user_id")
@@ -304,6 +342,19 @@ class MessageController:
     # ───────────────────────── GEÇMİŞ MESAJLAR ───────────────────────────────
 
     def load_historical_messages(self, chat_name: str, chat_id: str, messages: list):
+        starred_ids = set()
+        try:
+            # 'starred_container' içindeki kartları dolaşarak ID'leri toplayan bir yardımcı metod
+            for i in range(self.main_page.settings_page.starred_list_layout.count()):
+                item = self.main_page.settings_page.starred_list_layout.itemAt(i)
+                if item and item.widget():
+                    # Obje adından ID'yi geri alıyoruz: "star_card_{message_id}"
+                    card_name = item.widget().objectName()
+                    if card_name.startswith("star_card_"):
+                        starred_ids.add(card_name.replace("star_card_", ""))
+        except Exception as e:
+            print(f"[DEBUG] Yıldızlı ID'ler alınamadı: {e}")
+
         is_group = False
         for i in range(self.main_page.chat_screens_stack.count()):
             w = self.main_page.chat_screens_stack.widget(i)
@@ -321,6 +372,7 @@ class MessageController:
         unread_count = 0
         for message in messages:
             sender = message.get("sender")
+            msg_id = message.get("message_id")
             is_mine = (sender == self.current_username)
 
             if not is_mine and self.current_username not in message.get("read_by", []):
@@ -335,12 +387,16 @@ class MessageController:
                 decrypted = self.encryption_service.decrypt_message(encrypted_data, self.current_username)
                 content = decrypted if decrypted else "[Şifre Çözülemedi]"
 
+            is_msg_starred = msg_id in starred_ids
+
             self.main_page.add_message_to_ui(
                 chat_name, content, is_mine,
                 message.get("status", "delivered"),
                 read_by=actual_read_by,
+                message_id=msg_id,
                 timestamp=message.get("timestamp"),
-                sender_name=message.get("sender") if (is_group and not is_mine) else None
+                sender_name=message.get("sender") if (is_group and not is_mine) else None,
+                is_starred = is_msg_starred
             )
 
         self.main_page.update_chat_unread_count(chat_name, unread_count)

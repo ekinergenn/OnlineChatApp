@@ -560,10 +560,44 @@ class ChatServer:
         elif msg_type == "get_public_key_request":
             self.handle_get_public_key_request(conn, packet.get("payload", {}))
 
+        elif msg_type == "star_message_request":
+            payload = packet.get("payload", {})
+            action = payload.get("action")
+
+            from database.starred_repository import add_starred_message, remove_starred_message
+            if action == "star":
+                success = add_starred_message(payload)
+            else:
+                success = remove_starred_message(payload.get("message_id"), payload.get("starred_by"))
+
+            print(f"[SUNUCU] Yıldız işlemi ({action}) sonucu: {success}")
+
+            self.send_packet(conn, {
+                "type": "star_message_response",
+                "payload": {"status": "success" if success else "fail"}
+            })
+
+        elif msg_type == "get_starred_messages_request":
+            payload = packet.get("payload", {})
+            username = payload.get("username")
+
+            print(f"[SERVER DEBUG] {username} için sorgu yapılıyor...")
+
+            from database.starred_repository import get_user_starred_messages
+            messages = get_user_starred_messages(username)
+
+            print(f"[SERVER DEBUG] Sorgu sonucu: {len(messages)} mesaj bulundu.")  # Burası 0 mı?
+
+            response = {
+                "type": "get_starred_messages_response",
+                "payload": {"messages": messages}
+            }
+            self.send_packet(conn, response)
+
         # elif msg_type == "create_chat_request":
         #     payload = packet.get("payload", {})
         #     members = payload.get("members", []) # [gönderen, alıcı]
-            
+
         #     # 1. Benzersiz bir Chat ID üret (Örn: chat_17123456)
         #     import time
         #     new_chat_id = f"chat_{int(time.time())}"
