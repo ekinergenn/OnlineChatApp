@@ -1,4 +1,5 @@
 from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QPushButton
 
 
 class MessageController:
@@ -33,6 +34,39 @@ class MessageController:
         # E2EE: Anahtar hazır olduğunda bekleyen mesajları gönder
         if self.encryption_service:
             self.encryption_service.public_key_fetched_signal.connect(self._on_public_key_fetched)
+
+    def refresh_star_icons(self):
+        if not hasattr(self, 'user_starred_ids'):
+            return
+
+        for i in range(self.main_page.chat_screens_stack.count()):
+            widget = self.main_page.chat_screens_stack.widget(i)
+
+            if not hasattr(widget, 'msg_layout'):
+                continue
+
+            layout = widget.msg_layout
+
+            for j in range(layout.count()):
+                item = layout.itemAt(j)
+                if not item or not item.widget():
+                    continue
+
+                wrapper = item.widget()
+
+                buttons = wrapper.findChildren(QPushButton)
+                for btn in buttons:
+                    msg_id = getattr(btn, "message_id", None)
+
+                    if not msg_id:
+                        continue
+
+                    if msg_id in self.user_starred_ids:
+                        btn.setText("⭐")
+                        btn.setStyleSheet("color: #eab308; border: none; background: transparent; font-size: 16px;")
+                    else:
+                        btn.setText("☆")
+                        btn.setStyleSheet("color: #8696a0; border: none; background: transparent; font-size: 16px;")
 
     def handle_unstar_response(self, payload):
         """Sunucudan silme onayı geldiğinde tüm listeyi tazeler."""
@@ -78,26 +112,7 @@ class MessageController:
 
         print(f"[DEBUG] {len(self.user_starred_ids)} mesaj ID'si sarı görünmek üzere işaretlendi.")
 
-        # açık olan chat'i yeniden yükle (yıldızları göstermek için)
-        current_widget = self.main_page.chat_screens_stack.currentWidget()
-
-        if hasattr(current_widget, 'contact_name') and hasattr(current_widget, 'current_chat_id'):
-            chat_name = current_widget.contact_name
-            chat_id = current_widget.current_chat_id
-            messages_data = getattr(current_widget, 'messages_data', [])
-
-            if messages_data:
-                print("[FIX] Chat yeniden yükleniyor (yıldızlar için)")
-
-                # önce ekranı temizle
-                layout = current_widget.msg_layout
-                while layout.count() > 1:
-                    item = layout.takeAt(0)
-                    if item.widget():
-                        item.widget().deleteLater()
-
-                # tekrar yükle
-                self.load_historical_messages(chat_name, chat_id, messages_data)
+        self.refresh_star_icons()
 
     def handle_star_message(self, star_data):
         # Kullanıcı adını controller'daki mevcut kullanıcıdan alıp ekliyoruz

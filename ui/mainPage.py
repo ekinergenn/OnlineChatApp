@@ -825,6 +825,7 @@ class MainPageUI(QWidget):
         initial_color = "#eab308" if is_starred else "#8696a0"
 
         star_btn = QPushButton(initial_text)
+        star_btn.message_id = str(message_id)
         star_btn.setFixedSize(16, 16)
         star_btn.setCursor(QCursor(Qt.PointingHandCursor))
         star_btn.setStyleSheet(
