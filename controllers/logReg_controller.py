@@ -33,40 +33,40 @@ class LogRegController:
         if not username or not password:
             QMessageBox.warning(self.login_page, "Hata", "Alanlar boş bırakılamaz!")
             return
+        
+        # Şifreyi geçici olarak sakla (on_login_success için)
+        self.last_password = password
         self.logreg_service.send_login_request(username, password)
 
     def handle_register(self):
+        # ... (fullname, email vb. kodlar)
         fullname = self.register_page.fullname_input.text()
         email = self.register_page.email_input.text()
-        username = self.register_page.username_input.text()  # bunu ekleyeceğiz
+        username = self.register_page.username_input.text()
         password = self.register_page.password_input.text()
         confirm = self.register_page.password_confirm_input.text()
         tel = self.register_page.phone_input.text()
 
-        print(
-            f"[DEBUG] fullname={fullname}, email={email}, username={username}, password={password}, confirm={confirm}")
-
         if not fullname or not email or not username or not password:
             QMessageBox.warning(self.register_page, "Hata", "Tüm alanları doldurun!")
             return
-
         if password != confirm:
             QMessageBox.warning(self.register_page, "Hata", "Şifreler uyuşmuyor!")
             return
-
-        print("[DEBUG] send_register_request çağrılıyor...")
-
 
         self.logreg_service.send_register_request(username, password, fullname, email, tel)
 
     def on_login_response_received(self, server_payload):
         status = server_payload.get("status")
         if status == "success":
+            # Şifreyi payload'a ekle (E2EE sync için gerekli)
+            server_payload["password"] = getattr(self, "last_password", "")
+            
             QMessageBox.information(self.login_page, "Başarılı", "Sohbet ekranına yönlendiriliyorsunuz...")
             self.stacked_widget.setCurrentIndex(2)
-            # ← ekle
+            
             if self.on_login_success:
-                self.on_login_success(server_payload.get("profile"))
+                self.on_login_success(server_payload)
         else:
             hata_mesaji = server_payload.get("message", "Bilinmeyen bir hata oluştu.")
             QMessageBox.warning(self.login_page, "Giriş Başarısız", hata_mesaji)

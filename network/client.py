@@ -4,7 +4,7 @@ from network.message_handler import MessageHandler
 from network.protocol import Protocol
 
 class Client:
-    def __init__(self,services:list, host='127.0.0.1', port=12345):
+    def __init__(self,services:list, host='192.168.43.98', port=12345):
         self.host = host
         self.port = port
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

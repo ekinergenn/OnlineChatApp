@@ -4,7 +4,7 @@ import json
 import time
 import os
 from database.user_repository import find_user, create_user, search_users, delete_user, update_public_key, \
-    get_public_key, get_privacy_settings, update_privacy_settings
+    get_public_key, get_privacy_settings, update_privacy_settings, update_private_key_backup
 from database.message_repository import save_message, get_messages, mark_messages_as_read
 from database.chat_repository import create_chat, get_all_chats, get_chat_, get_user_chats, delete_chat, MESSAGES_DIR
 from database import block_repository, community_repository
@@ -12,7 +12,7 @@ from database.db import write_json
 
 
 class ChatServer:
-    def __init__(self, host='127.0.0.1', port=12345):
+    def __init__(self, host='0.0.0.0', port=12345):
         self.host = host
         self.port = port
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -38,44 +38,30 @@ class ChatServer:
         buffer = ""
         while True:
             try:
-                # 1. Ham veriyi al
                 raw_data = conn.recv(4096)
                 if not raw_data:
                     break
-
-                # 2. Protokolüne uygun olarak veriyi tamponda biriktir ve parçala
                 buffer += raw_data.decode('utf-8')
-
                 while "<END>" in buffer:
                     msg, buffer = buffer.split("<END>", 1)
                     if not msg: continue
-
                     try:
                         packet = json.loads(msg)
-                        print(f"[GELEN PAKET] {addr}: {packet}")
-                        # 3. Gelen paketi işle ve cevap hazırla
                         self.process_request(conn, packet)
                     except json.JSONDecodeError as e:
-                        print(f"[HATA] {addr} için JSON çözümleme hatası: {e} - Mesaj: {msg}")
-
+                        print(f"[HATA] {addr} için JSON çözümleme hatası: {e}")
             except Exception as e:
                 print(f"[HATA] {addr} bağlantı hatası: {e}")
                 break
 
-        print(f"[AYRILDI] {addr} bağlantısı kesildi.")
-
-        # Online kullanıcılardan temizle
         user_to_remove = None
         for username, socket in self.online_users.items():
             if socket == conn:
                 user_to_remove = username
                 break
         if user_to_remove:
-            self.last_seen[user_to_remove] = int(time.time())  # ← YENİ
+            self.last_seen[user_to_remove] = int(time.time())
             del self.online_users[user_to_remove]
-            print(f"[SİSTEM] {user_to_remove} online listesinden çıkarıldı.")
-
-            # ← YENİ: diğer kullanıcılara offline bildirimi gönder
             self._broadcast_status(user_to_remove, "offline", self.last_seen[user_to_remove])
 
         if conn in self.clients:
@@ -83,10 +69,7 @@ class ChatServer:
         conn.close()
 
     def _broadcast_status(self, username, status, last_seen_ts=None):
-        """İlgili kullanıcının durumunu sohbet ettiği herkese bildirir."""
-        from database.user_repository import get_privacy_settings
         privacy = get_privacy_settings(username)
-
         if not privacy.get("online_status", True):
             status = "offline"
         if not privacy.get("last_seen", True):
@@ -94,24 +77,18 @@ class ChatServer:
 
         all_chats = get_all_chats()
         notified = set()
-
         for chat in all_chats:
             if username in chat.get("members", []):
                 for member in chat["members"]:
                     if member != username and member in self.online_users and member not in notified:
                         packet = {
                             "type": "user_status_update",
-                            "payload": {
-                                "username": username,
-                                "status": status,
-                                "last_seen": last_seen_ts
-                            }
+                            "payload": {"username": username, "status": status, "last_seen": last_seen_ts}
                         }
                         self.send_packet(self.online_users[member], packet)
                         notified.add(member)
 
     def process_request(self, conn, packet):
-        """İstemcinin gönderdiği 'type' değerine göre cevap üretir."""
         msg_type = packet.get("type")
         payload = packet.get("payload", {})
 
@@ -125,735 +102,257 @@ class ChatServer:
             self.handle_search_communities(conn, payload)
         elif msg_type == "get_user_communities_request":
             self.handle_get_user_communities(conn, payload)
+        elif msg_type == "update_private_key_backup_request":
+            self.handle_update_private_key_backup(conn, payload)
         elif msg_type == "login_request":
-            username = payload.get("name")
-            password = payload.get("password")
-
-            user = find_user(username)
-            if user and user["password"] == password:
-                stale = [u for u, s in list(self.online_users.items()) if s == conn and u != user["username"]]
-                for stale_user in stale:
-                    del self.online_users[stale_user]
-                    print(f"[SİSTEM] Stale kullanıcı temizlendi: {stale_user}")
-
-                self.online_users[user["username"]] = conn
-                self._broadcast_status(user["username"], "online")
-                response = {
-                    "type": "login_response",
-                    "payload": {
-                        "status": "success",
-                        "profile": {
-                            "username": user["username"],
-                            "fullname": user["fullname"],
-                            "email": user["email"],
-                            "tel": user["tel"],
-                            "user_id": user["user_id"]
-                        }
-                    }
-                }
-            else:
-                response = {
-                    "type": "login_response",
-                    "payload": {
-                        "status": "fail",
-                        "message": "Kullanıcı adı veya şifre hatalı!"
-                    }
-                }
-            self.send_packet(conn, response)
-
+            self.handle_login(conn, payload)
         elif msg_type == "register_request":
-            success = create_user(
-                username=payload.get("username"),
-                password=payload.get("password"),
-                fullname=payload.get("fullname"),
-                tel=payload.get("tel", ""),
-                email=payload.get("email")
-            )
-            response = {
-                "type": "register_response",
-                "payload": {
-                    "status": "success" if success else "fail",
-                    "message": "Kayıt başarılı!" if success else "Bu kullanıcı adı zaten alınmış."
-                }
-            }
-            self.send_packet(conn, response)
-
-
+            self.handle_register(conn, payload)
         elif msg_type == "chat_message":
-            chat_id = payload.get("chat_id")
-            sender_name = payload.get("sender")
-
-            all_chats = get_all_chats()
-            active_chat = get_chat_(all_chats, chat_id)
-
-            if active_chat and (sender_name in active_chat["members"]):
-                receivers = [m for m in active_chat["members"] if m != sender_name]
-                sender_user = find_user(sender_name)
-
-                can_send = True
-                if sender_user:
-                    sender_id = sender_user.get("user_id")
-                    for r_name in receivers:
-                        receiver_user = find_user(r_name)
-                        if receiver_user:
-                            receiver_id = receiver_user.get("user_id")
-                            status = block_repository.check_block_status(sender_id, receiver_id)
-                            if status != "none":
-                                can_send = False
-                                break
-
-                if not can_send:
-                    response = {
-                        "type": "error",
-                        "payload": {"message": "Bu kullanıcıya mesaj gönderemezsiniz (Engelleme mevcut)."}
-                    }
-                    self.send_packet(conn, response)
-                    return
-
-                saved_message = save_message(payload)
-
-                # Forward to online members
-                for member in active_chat["members"]:
-                    if member in self.online_users:
-                        member_socket = self.online_users[member]
-                        response_packet = {
-                            "type": "chat_message",
-                            "payload": saved_message
-                        }
-                        self.send_packet(member_socket, response_packet)
+            self.handle_chat_message(conn, payload)
         elif msg_type == "typing_indicator":
-            payload = packet.get("payload", {})
-            chat_id = payload.get("chat_id")
-            sender_name = payload.get("sender")
-            is_typing = payload.get("is_typing", False)
-
-            all_chats = get_all_chats()
-            active_chat = get_chat_(all_chats, chat_id)
-
-            if active_chat:
-                for member in active_chat["members"]:
-                    if member != sender_name and member in self.online_users:
-                        self.send_packet(self.online_users[member], {
-                            "type": "typing_indicator",
-                            "payload": {
-                                "chat_id": chat_id,
-                                "sender": sender_name,
-                                "is_typing": is_typing
-                            }
-                        })
-
+            self.handle_typing_indicator(payload)
         elif msg_type == "get_user_status_request":
-            payload = packet.get("payload", {})
-            target_username = payload.get("username")
-
-            from database.user_repository import get_privacy_settings
-            privacy = get_privacy_settings(target_username)
-
-            is_online = target_username in self.online_users
-            if not privacy.get("online_status", True):
-                is_online = False
-
-            last_seen_ts = self.last_seen.get(target_username)
-            if not privacy.get("last_seen", True):
-                last_seen_ts = None
-
-            self.send_packet(conn, {
-                "type": "get_user_status_response",
-                "payload": {
-                    "username": target_username,
-                    "status": "online" if is_online else "offline",
-                    "last_seen": last_seen_ts
-                }
-            })
-
-
+            self.handle_get_user_status(conn, payload)
         elif msg_type == "mark_messages_read":
-            payload = packet.get("payload", {})
-            chat_id = payload.get("chat_id")
-            message_ids = payload.get("message_ids", [])
-            username = payload.get("username")
-
-            if chat_id and message_ids and username:
-                mark_messages_as_read(chat_id, message_ids, username)
-
-                # İsteğe bağlı olarak diğer üyelere ilet (Okundu bilgisinin canlı güncellenmesi için)
-                from database.user_repository import get_privacy_settings
-                privacy = get_privacy_settings(username)
-                if privacy.get("read_receipts", True):
-                    all_chats = get_all_chats()
-                    active_chat = get_chat_(all_chats, chat_id)
-                    if active_chat:
-                        for member in active_chat["members"]:
-                            if member != username and member in self.online_users:
-                                member_socket = self.online_users[member]
-                                response_packet = {
-                                    "type": "messages_read_receipt",
-                                    "payload": {
-                                        "chat_id": chat_id,
-                                        "message_ids": message_ids,
-                                        "read_by": username
-                                    }
-                                }
-                                self.send_packet(member_socket, response_packet)
-
+            self.handle_mark_read(payload)
         elif msg_type == "get_privacy_settings_request":
-            payload = packet.get("payload", {})
-            username = payload.get("username")
-            from database.user_repository import get_privacy_settings
-            settings = get_privacy_settings(username)
-            self.send_packet(conn, {
-                "type": "get_privacy_settings_response",
-                "payload": {"username": username, "settings": settings}
-            })
-
+            self.handle_get_privacy(conn, payload)
         elif msg_type == "update_privacy_settings_request":
-            payload = packet.get("payload", {})
-            username = payload.get("username")
-            settings = payload.get("settings", {})
-            from database.user_repository import update_privacy_settings
-            success = update_privacy_settings(username, settings)
-            self.send_packet(conn, {
-                "type": "update_privacy_settings_response",
-                "payload": {"status": "success" if success else "fail"}
-            })
-
-            # Anında durumu yayınla (eğer çevrimiçi kapandıysa offline göndersin)
-            if "online_status" in settings:
-                if settings["online_status"]:
-                    if username in self.online_users:
-                        self._broadcast_status(username, "online")
-                else:
-                    self._broadcast_status(username, "offline", self.last_seen.get(username))
-
+            self.handle_update_privacy(conn, payload)
         elif msg_type == "get_user_chats_request":
-            payload = packet.get("payload", {})
-            username = payload.get("username")
-
-            user_chats = get_user_chats(username)
-            all_chats = get_all_chats()
-            packet_data = []
-
-            from database.user_repository import get_privacy_settings
-            privacy_cache = {}
-
-            for chat_id in user_chats:
-                chat_messages = get_messages(chat_id)
-
-                # Apply read_receipts privacy
-                for msg in chat_messages:
-                    filtered_read_by = []
-                    for reader in msg.get("read_by", []):
-                        if reader not in privacy_cache:
-                            privacy_cache[reader] = get_privacy_settings(reader).get("read_receipts", True)
-
-                        if reader == username or privacy_cache[reader]:
-                            filtered_read_by.append(reader)
-                    msg["read_by"] = filtered_read_by
-
-                chat_obj = get_chat_(all_chats, chat_id)
-                display_name = chat_id
-
-                other_user_id = None
-                if chat_obj and chat_obj.get("is_group"):
-                    display_name = chat_obj.get("chat_name") or chat_id
-                elif chat_obj and len(chat_obj.get("members", [])) == 2:
-                    other_members = [m for m in chat_obj.get("members", []) if m != username]
-                    if other_members:
-                        display_name = other_members[0]
-                        ou = find_user(display_name)
-                        if ou:
-                            other_user_id = ou.get("user_id")
-
-                sender_user = find_user(username)
-                block_status = "none"
-                if sender_user and chat_obj and len(chat_obj.get("members", [])) == 2:
-                    other_member_name = [m for m in chat_obj.get("members", []) if m != username][0]
-                    other_user = find_user(other_member_name)
-                    if other_user:
-                        block_status = block_repository.check_block_status(sender_user.get("user_id"),
-                                                                           other_user.get("user_id"))
-
-                packet_data.append({
-                    "chat_id": chat_id,
-                    "chat_name": display_name,
-                    "other_user_id": other_user_id,
-                    "messages": chat_messages,
-                    "block_status": block_status,
-                    "is_group": chat_obj.get("is_group", False) if chat_obj else False,
-                    "members": chat_obj.get("members", []) if chat_obj else []
-                })
-
-            response = {
-                "type": "get_user_chats_response",
-                "payload": {
-                    "status": "success",
-                    "chats": packet_data
-                }
-            }
-            self.send_packet(conn, response)
-
+            self.handle_get_user_chats(conn, payload)
         elif msg_type == "create_chat_request":
-            payload = packet.get("payload", {})
-            members = payload.get("members", [])
-
-            import time
-            new_chat_id = f"chat_{int(time.time())}"
-
-            try:
-                # 1. Sohbet listesine (chats.json) ekle[cite: 6]
-                create_chat(new_chat_id, members, is_group=False)
-
-                # 2. KRİTİK ADIM: Mesaj dosyasını (messages/chat_id.json) o an oluştur
-                # Boş bir liste yazarak dosyanın varlığını garantiliyoruz
-                from database.db import write_json
-                write_json(f"messages/{new_chat_id}.json", [])
-
-                # 3. Yanıtı gönder
-                response = {
-                    "type": "create_chat_response",
-                    "payload": {
-                        "status": "success",
-                        "chat_id": new_chat_id,
-                        "target_username": members[1] if len(members) > 1 else ""
-                    }
-                }
-                self.send_packet(conn, response)
-            except Exception as e:
-                print(f"[HATA] Sohbet dosyası oluşturulamadı: {e}")
-
-        elif msg_type == "delete_chat_request":
-            payload = packet.get("payload", {})
-            chat_id = payload.get("chat_id")
-            username = payload.get("username", "")
-
-            all_chats = get_all_chats()
-            chat_obj = get_chat_(all_chats, chat_id)
-
-            if chat_obj and chat_obj.get("is_group"):
-                from database.chat_repository import hide_group_chat
-                success = hide_group_chat(chat_id, username)
-
-            else:
-                # İkili sohbetlerde silme işlemi (dosyayı siler)
-                from database.chat_repository import delete_chat
-                success = delete_chat(chat_id)
-
-            response = {
-                "type": "delete_chat_response",
-                "payload": {"status": "success" if success else "fail", "chat_id": chat_id}
-            }
-            self.send_packet(conn, response)
-
-        elif msg_type == "search_users_request":
-            payload = packet.get("payload", {})
-            query = payload.get("query", "").lower()
-            requester = payload.get("username", "")
-            sanitized_results = []
-
-            # kullanıcıları tara
-            user_results = search_users(query, exclude_username=requester)
-
-            for u in user_results:
-                sanitized_results.append({
-                    "is_group": False,
-                    "username": u.get("username"),
-                    "fullname": u.get("fullname"),
-                    "user_id": u.get("user_id")
-                })
-
-            # grupları tara
-            all_chats = get_all_chats()
-            if isinstance(all_chats, list):
-                for chat in all_chats:
-                    # Kullanıcının üyesi olduğu grupları tara
-                    if chat.get("is_group") is True and requester in chat.get("members", []):
-                        chat_name = chat.get("chat_name", "")
-                        if query in chat_name.lower():
-                            sanitized_results.append({
-                                "is_group": True,
-                                "chat_id": chat.get("chat_id"),
-                                "chat_name": chat_name,
-                                "members": chat.get("members")
-                            })
-
-            response = {
-                "type": "search_users_response",
-                "payload": {
-                    "status": "success",
-                    "results": sanitized_results
-                }
-            }
-            self.send_packet(conn, response)
-
-        elif msg_type == "block_user_request":
-            payload = packet.get("payload", {})
-            blocker_id = payload.get("blocker_id")
-            blocked_id = payload.get("blocked_id")
-
-            block_repository.add_or_update_block(blocker_id, blocked_id, status=True)
-
-            response = {
-                "type": "block_user_response",
-                "payload": {"status": "success", "blocker_id": blocker_id, "blocked_id": blocked_id, "is_blocked": True}
-            }
-            self.send_packet(conn, response)
-
-        elif msg_type == "unblock_user_request":
-            payload = packet.get("payload", {})
-            blocker_id = payload.get("blocker_id")
-            blocked_id = payload.get("blocked_id")
-
-            block_repository.add_or_update_block(blocker_id, blocked_id, status=False)
-
-            response = {
-                "type": "block_user_response",
-                "payload": {"status": "success", "blocker_id": blocker_id, "blocked_id": blocked_id,
-                            "is_blocked": False}
-            }
-            self.send_packet(conn, response)
-
-        elif msg_type == "get_block_list_request":
-            payload = packet.get("payload", {})
-            user_id = payload.get("user_id")
-
-            all_blocks = block_repository.get_all_blocks()
-            from database.user_repository import get_all_users
-            all_users = get_all_users()
-            user_dict = {str(u["user_id"]): u["username"] for u in all_users}
-
-            user_blocks = []
-            for b in all_blocks:
-                if str(b.get("blocker_id")) == str(user_id) and b.get("isBlocked"):
-                    blocked_id_str = str(b.get("blocked_id"))
-                    blocked_username = user_dict.get(blocked_id_str, "Bilinmeyen Kullanıcı")
-                    user_blocks.append({
-                        "blocker_id": b.get("blocker_id"),
-                        "blocked_id": b.get("blocked_id"),
-                        "blocked_username": blocked_username,
-                        "isBlocked": b.get("isBlocked")
-                    })
-
-            response = {
-                "type": "get_block_list_response",
-                "payload": {"status": "success", "blocks": user_blocks}
-            }
-            self.send_packet(conn, response)
-
-        elif msg_type == "get_all_users_request":
-            payload = packet.get("payload", {})
-            requester = payload.get("username", "")
-
-            from database.user_repository import get_all_users
-            all_users = get_all_users()
-
-            sanitized = []
-            for u in all_users:
-                if u.get("username") != requester:
-                    sanitized.append({
-                        "username": u.get("username"),
-                        "fullname": u.get("fullname"),
-                        "user_id": u.get("user_id")
-                    })
-
-            response = {
-                "type": "get_all_users_response",
-                "payload": {"status": "success", "users": sanitized}
-            }
-            self.send_packet(conn, response)
-
+            self.handle_create_chat(conn, payload)
         elif msg_type == "create_group_request":
-            payload = packet.get("payload", {})
-            group_name = payload.get("group_name", "")
-            members = payload.get("members", [])
-
-            import time
-            new_chat_id = f"group_{int(time.time())}"
-
-            try:
-                create_chat(new_chat_id, members, is_group=True, chat_name=group_name)
-
-                from database.db import write_json
-                write_json(f"messages/{new_chat_id}.json", [])
-
-                response = {
-                    "type": "create_group_response",
-                    "payload": {
-                        "status": "success",
-                        "chat_id": new_chat_id,
-                        "group_name": group_name,
-                        "members": members
-                    }
-                }
-                self.send_packet(conn, response)
-
-                for member in members:
-                    if member in self.online_users and self.online_users[member] != conn:
-                        self.send_packet(self.online_users[member], response)
-
-            except Exception as e:
-                print(f"[HATA] Grup oluşturulamadı: {e}")
-                response = {
-                    "type": "create_group_response",
-                    "payload": {"status": "fail", "message": str(e)}
-                }
-                self.send_packet(conn, response)
-
+            self.handle_create_group(conn, payload)
+        elif msg_type == "delete_chat_request":
+            self.handle_delete_chat(conn, payload)
+        elif msg_type == "search_users_request":
+            self.handle_search_users(conn, payload)
+        elif msg_type == "get_all_users_request":
+            self.handle_get_all_users(conn, payload)
+        elif msg_type == "block_user_request":
+            self.handle_block(conn, payload, True)
+        elif msg_type == "unblock_user_request":
+            self.handle_block(conn, payload, False)
+        elif msg_type == "get_block_list_request":
+            self.handle_get_block_list(conn, payload)
         elif msg_type == "delete_account_request":
-            payload = packet.get("payload", {})
-            username = payload.get("username")
-            print(f"[DEBUG] Silme isteği geldi. Kullanıcı: '{username}'")
-
-            # user chatleri temizlenir
-            from database.chat_repository import cleanup_user_chats
-            cleanup_user_chats(username)
-
-            # Repository fonksiyonunu çağır
-            from database.user_repository import delete_user
-            success = delete_user(username)
-            if success:
-                print(f"[DEBUG] Silme BAŞARILI.")
-                response = {"type": "delete_account_response", "payload": {"status": "success"}}
-            else:
-                print(f"[DEBUG] Silme BAŞARISIZ. Kullanıcı bulunamadı veya dosya yazılamadı.")
-                response = {"type": "delete_account_response", "payload": {"status": "fail"}}
-
-            self.send_packet(conn, response)
-
+            self.handle_delete_account(conn, payload)
         elif msg_type == "update_profile_request":
-            payload = packet.get("payload", {})
-            username = payload.get("username")
-
-            from database.user_repository import update_user_info
-            success = update_user_info(
-                username=username,
-                fullname=payload.get("fullname"),
-                email=payload.get("email"),
-                tel=payload.get("tel")
-            )
-
-            response = {
-                "type": "update_profile_response",
-                "payload": {"status": "success" if success else "fail"}
-            }
-            self.send_packet(conn, response)
-
+            self.handle_update_profile(conn, payload)
         elif msg_type == "update_public_key_request":
-            self.handle_update_public_key_request(conn, packet.get("payload", {}))
-
+            self.handle_update_public_key(conn, payload)
         elif msg_type == "get_public_key_request":
-            self.handle_get_public_key_request(conn, packet.get("payload", {}))
-
-        elif msg_type == "unstar_request":
-            payload = packet.get("payload", {})
-            msg_id = payload.get("message_id")
-            username = payload.get("username")  # Yıldızlayan kişi
-
-            from database.starred_repository import remove_starred_message
-            success = remove_starred_message(msg_id, username)
-
-            # istemciye silindiğine dair onay gönder
-            response = {
-                "type": "unstar_response",
-                "payload": {"message_id": msg_id, "success": success}
-            }
-            self.send_packet(conn, response)
-
+            self.handle_get_public_key(conn, payload)
         elif msg_type == "star_message_request":
-            payload = packet.get("payload", {})
-            action = payload.get("action")
-
-            from database.starred_repository import add_starred_message, remove_starred_message
-            if action == "star":
-                success = add_starred_message(payload)
-            else:
-                success = remove_starred_message(payload.get("message_id"), payload.get("starred_by"))
-
-            print(f"[SUNUCU] Yıldız işlemi ({action}) sonucu: {success}")
-
-            self.send_packet(conn, {
-                "type": "star_message_response",
-                "payload": {"status": "success" if success else "fail"}
-            })
-
+            self.handle_star_message(conn, payload)
         elif msg_type == "get_starred_messages_request":
-            payload = packet.get("payload", {})
-            username = payload.get("username")
-
-            print(f"[SERVER DEBUG] {username} için sorgu yapılıyor...")
-
-            from database.starred_repository import get_user_starred_messages
-            messages = get_user_starred_messages(username)
-
-            print(f"[SERVER DEBUG] Sorgu sonucu: {len(messages)} mesaj bulundu.")  # Burası 0 mı?
-
-            response = {
-                "type": "get_starred_messages_response",
-                "payload": {"messages": messages}
-            }
-            self.send_packet(conn, response)
-
-        # elif msg_type == "create_chat_request":
-        #     payload = packet.get("payload", {})
-        #     members = payload.get("members", []) # [gönderen, alıcı]
-
-        #     # 1. Benzersiz bir Chat ID üret (Örn: chat_17123456)
-        #     import time
-        #     new_chat_id = f"chat_{int(time.time())}"
-
-        #     try:
-        #         # 2. Veritabanına (chats.json) kaydet[cite: 6]
-        #         # is_group=False çünkü bu bir birebir sohbet
-        #         create_chat(new_chat_id, members, is_group=False)
-
-        #         # 3. İsteği gönderen kişiye yanıt dön
-        #         response = {
-        #             "type": "create_chat_response",
-        #             "payload": {
-        #                 "status": "success",
-        #                 "chat_id": new_chat_id,
-        #                 "target_username": members[1] # Kiminle sohbet açıldıysa o
-        #             }
-        #         }
-        #         self.send_packet(conn, response)
-        #         print(f"[SOHBET] '{new_chat_id}' oluşturuldu, üyeler: {members}")
-        #     except Exception as e:
-        #         print(f"[SOHBET HATA] {e}")
+            self.handle_get_starred_messages(conn, payload)
+        elif msg_type == "unstar_request":
+            self.handle_unstar(conn, payload)
 
     def send_packet(self, conn, packet_dict):
-        """Senin Protocol.py yapına uygun şekilde gönderim yapar."""
         try:
             json_data = json.dumps(packet_dict) + "<END>"
             conn.sendall(json_data.encode('utf-8'))
-        except Exception as e:
-            print(f"[AĞ HATASI] Paket gönderilemedi (bağlantı kesilmiş olabilir): {e}")
-
-    def handle_update_public_key_request(self, conn, payload: dict):
-        """Kullanıcının genel anahtarını sunucu veritabanına kaydeder."""
-        username = payload.get("username")
-        public_key = payload.get("public_key")
-        if username and public_key:
-            success = update_public_key(username, public_key)
-            print(f"[E2EE] {username} için genel anahtar {'kaydedildi' if success else 'kaydedilemedi'}.")
-
-    def handle_get_public_key_request(self, conn, payload: dict):
-        """Bir kullanıcının sunucuda kayıtlı genel anahtarını döndürür."""
-        username = payload.get("username")
-        public_key = get_public_key(username) if username else None
-        if public_key:
-            self.send_packet(conn, {
-                "type": "get_public_key_response",
-                "payload": {
-                    "status": "success",
-                    "username": username,
-                    "public_key": public_key
-                }
-            })
-        else:
-            self.send_packet(conn, {
-                "type": "get_public_key_response",
-                "payload": {
-                    "status": "not_found",
-                    "username": username,
-                    "message": "Genel anahtar bulunamadı."
-                }
-            })
-
-    def handle_community_message(self, payload):
-        comm_id = payload.get("community_id")
-        sender = payload.get("sender")
-        content = payload.get("content")
-        
-        # ID'yi int'e çevirerek karşılaştır (güvenlik için)
-        try:
-            comm_id = int(comm_id)
         except:
             pass
 
-        # Sadece kurucu mesaj atabilir
-        communities = community_repository.get_all_communities()
-        target_comm = next((c for c in communities if c["community_id"] == comm_id), None)
-        
-        if not target_comm:
-            print(f"[UYARI] Topluluk {comm_id} bulunamadı.")
-            return
-
-        if target_comm["creator"] != sender:
-            print(f"[UYARI] {sender} topluluk {comm_id} için yetkisiz mesaj denemesi yaptı. (Kurucu: {target_comm['creator']})")
-            return
-
-        # Mesajı kaydet (message_repository.save_message payload bekler)
-        msg_payload = {
-            "chat_id": target_comm["messages_file"].replace(".json", ""),
-            "sender": sender,
-            "content": content,
-            "timestamp": time.time(),
-            "message_id": int(time.time() * 1000)
-        }
-        save_message(msg_payload)
-        
-        # Üyelere ilet
-        members = target_comm.get("members", [])
-        broadcast_payload = {
-            "type": "community_message",
-            "payload": {
-                "community_id": comm_id,
-                "sender": sender,
-                "content": content,
-                "timestamp": time.time()
+    # --- Handlers ---
+    def handle_login(self, conn, payload):
+        username = payload.get("name")
+        password = payload.get("password")
+        user = find_user(username)
+        if user and user["password"] == password:
+            self.online_users[username] = conn
+            self._broadcast_status(username, "online")
+            response = {
+                "type": "login_response",
+                "payload": {
+                    "status": "success",
+                    "username": user["username"],
+                    "fullname": user["fullname"],
+                    "email": user["email"],
+                    "tel": user["tel"],
+                    "encrypted_private_key": user.get("encrypted_private_key"),
+                    "user_id": user["user_id"]
+                }
             }
-        }
-        
-        for member in members:
-            if member in self.online_users:
-                self.send_packet(self.online_users[member], broadcast_payload)
+        else:
+            response = {"type": "login_response", "payload": {"status": "fail", "message": "Hatalı giriş!"}}
+        self.send_packet(conn, response)
+
+    def handle_register(self, conn, payload):
+        success = create_user(payload.get("username"), payload.get("password"), payload.get("fullname"), payload.get("email"), payload.get("tel", ""))
+        self.send_packet(conn, {"type": "register_response", "payload": {"status": "success" if success else "fail"}})
+
+    def handle_chat_message(self, conn, payload):
+        chat_id = payload.get("chat_id")
+        sender = payload.get("sender")
+        all_chats = get_all_chats()
+        chat = get_chat_(all_chats, chat_id)
+        if chat and sender in chat["members"]:
+            saved = save_message(payload)
+            for m in chat["members"]:
+                if m in self.online_users:
+                    self.send_packet(self.online_users[m], {"type": "chat_message", "payload": saved})
+
+    def handle_typing_indicator(self, payload):
+        chat_id = payload.get("chat_id")
+        sender = payload.get("sender")
+        all_chats = get_all_chats()
+        chat = get_chat_(all_chats, chat_id)
+        if chat:
+            for m in chat["members"]:
+                if m != sender and m in self.online_users:
+                    self.send_packet(self.online_users[m], {"type": "typing_indicator", "payload": payload})
+
+    def handle_get_user_status(self, conn, payload):
+        target = payload.get("username")
+        privacy = get_privacy_settings(target)
+        is_online = target in self.online_users if privacy.get("online_status", True) else False
+        last_seen = self.last_seen.get(target) if privacy.get("last_seen", True) else None
+        self.send_packet(conn, {"type": "get_user_status_response", "payload": {"username": target, "status": "online" if is_online else "offline", "last_seen": last_seen}})
+
+    def handle_mark_read(self, payload):
+        mark_messages_as_read(payload.get("chat_id"), payload.get("message_ids", []), payload.get("username"))
+
+    def handle_get_privacy(self, conn, payload):
+        username = payload.get("username")
+        settings = get_privacy_settings(username)
+        self.send_packet(conn, {"type": "get_privacy_settings_response", "payload": {"username": username, "settings": settings}})
+
+    def handle_update_privacy(self, conn, payload):
+        username = payload.get("username")
+        success = update_privacy_settings(username, payload.get("settings", {}))
+        self.send_packet(conn, {"type": "update_privacy_settings_response", "payload": {"status": "success" if success else "fail"}})
+
+    def handle_get_user_chats(self, conn, payload):
+        username = payload.get("username")
+        chat_ids = get_user_chats(username)
+        all_chats = get_all_chats()
+        results = []
+        for cid in chat_ids:
+            chat_obj = get_chat_(all_chats, cid)
+            if chat_obj:
+                results.append({
+                    "chat_id": cid,
+                    "chat_name": chat_obj.get("chat_name") or ([m for m in chat_obj["members"] if m != username][0] if len(chat_obj["members"])==2 else cid),
+                    "messages": get_messages(cid),
+                    "members": chat_obj["members"],
+                    "is_group": chat_obj.get("is_group", False)
+                })
+        self.send_packet(conn, {"type": "get_user_chats_response", "payload": {"status": "success", "chats": results}})
+
+    def handle_create_chat(self, conn, payload):
+        members = payload.get("members", [])
+        chat_id = f"chat_{int(time.time())}"
+        create_chat(chat_id, members, is_group=False)
+        write_json(f"messages/{chat_id}.json", [])
+        self.send_packet(conn, {"type": "create_chat_response", "payload": {"status": "success", "chat_id": chat_id, "target_username": members[1] if len(members)>1 else ""}})
+
+    def handle_create_group(self, conn, payload):
+        chat_id = f"group_{int(time.time())}"
+        create_chat(chat_id, payload["members"], is_group=True, chat_name=payload["group_name"])
+        write_json(f"messages/{chat_id}.json", [])
+        resp = {"type": "create_group_response", "payload": {"status": "success", "chat_id": chat_id, "group_name": payload["group_name"], "members": payload["members"]}}
+        for m in payload["members"]:
+            if m in self.online_users: self.send_packet(self.online_users[m], resp)
+
+    def handle_delete_chat(self, conn, payload):
+        success = delete_chat(payload["chat_id"])
+        self.send_packet(conn, {"type": "delete_chat_response", "payload": {"status": "success" if success else "fail", "chat_id": payload["chat_id"]}})
+
+    def handle_search_users(self, conn, payload):
+        results = search_users(payload["query"], payload.get("username"))
+        sanitized = [{"username": u["username"], "fullname": u["fullname"], "user_id": u["user_id"]} for u in results]
+        self.send_packet(conn, {"type": "search_users_response", "payload": {"status": "success", "results": sanitized}})
+
+    def handle_get_all_users(self, conn, payload):
+        from database.user_repository import get_all_users
+        users = get_all_users()
+        sanitized = [{"username": u["username"], "fullname": u["fullname"], "user_id": u["user_id"]} for u in users if u["username"] != payload.get("username")]
+        self.send_packet(conn, {"type": "get_all_users_response", "payload": {"status": "success", "users": sanitized}})
+
+    def handle_block(self, conn, payload, status):
+        block_repository.add_or_update_block(payload["blocker_id"], payload["blocked_id"], status)
+        self.send_packet(conn, {"type": "block_user_response", "payload": {"status": "success", "is_blocked": status}})
+
+    def handle_get_block_list(self, conn, payload):
+        blocks = block_repository.get_all_blocks()
+        user_blocks = [b for b in blocks if str(b["blocker_id"]) == str(payload["user_id"]) and b["isBlocked"]]
+        self.send_packet(conn, {"type": "get_block_list_response", "payload": {"status": "success", "blocks": user_blocks}})
+
+    def handle_delete_account(self, conn, payload):
+        success = delete_user(payload["username"])
+        self.send_packet(conn, {"type": "delete_account_response", "payload": {"status": "success" if success else "fail"}})
+
+    def handle_update_profile(self, conn, payload):
+        from database.user_repository import update_user_info
+        success = update_user_info(payload["username"], payload["fullname"], payload["email"], payload["tel"])
+        self.send_packet(conn, {"type": "update_profile_response", "payload": {"status": "success" if success else "fail"}})
+
+    def handle_update_public_key(self, conn, payload):
+        success = update_public_key(payload["username"], payload["public_key"])
+        print(f"[E2EE] Public key update: {success}")
+
+    def handle_get_public_key(self, conn, payload):
+        pk = get_public_key(payload["username"])
+        self.send_packet(conn, {"type": "get_public_key_response", "payload": {"status": "success" if pk else "not_found", "username": payload["username"], "public_key": pk}})
+
+    def handle_community_message(self, payload):
+        comm_id = int(payload["community_id"])
+        sender = payload["sender"]
+        communities = community_repository.get_all_communities()
+        target = next((c for c in communities if c["community_id"] == comm_id), None)
+        if target and target["creator"] == sender:
+            msg_payload = {"chat_id": f"community_{comm_id}", "sender": sender, "content": payload["content"], "timestamp": time.time(), "message_id": int(time.time()*1000)}
+            save_message(msg_payload)
+            broadcast = {"type": "community_message", "payload": {"community_id": comm_id, "sender": sender, "content": payload["content"], "timestamp": time.time()}}
+            for m in target["members"]:
+                if m in self.online_users: self.send_packet(self.online_users[m], broadcast)
 
     def handle_create_community(self, conn, payload):
-        name = payload.get("name")
-        creator = payload.get("creator")
-        new_comm = community_repository.create_community(name, creator)
-        
-        # Mesaj dosyasını ilklendir
-        write_json("messages/" + new_comm["messages_file"], [])
-        
-        self.send_packet(conn, {
-            "type": "create_community_response",
-            "payload": {"status": "success", "community": new_comm}
-        })
+        new_comm = community_repository.create_community(payload["name"], payload["creator"])
+        write_json(f"messages/community_{new_comm['community_id']}.json", [])
+        self.send_packet(conn, {"type": "create_community_response", "payload": {"status": "success", "community": new_comm}})
 
     def handle_join_community(self, conn, payload):
-        comm_id = payload.get("community_id")
-        username = payload.get("username")
-        success = community_repository.join_community(comm_id, username)
-        
-        self.send_packet(conn, {
-            "type": "join_community_response",
-            "payload": {"status": "success" if success else "fail", "community_id": comm_id}
-        })
+        success = community_repository.join_community(payload["community_id"], payload["username"])
+        self.send_packet(conn, {"type": "join_community_response", "payload": {"status": "success" if success else "fail"}})
 
     def handle_search_communities(self, conn, payload):
-        query = payload.get("query")
-        results = community_repository.search_communities(query)
-        self.send_packet(conn, {
-            "type": "search_communities_response",
-            "payload": {"results": results}
-        })
+        results = community_repository.search_communities(payload["query"])
+        self.send_packet(conn, {"type": "search_communities_response", "payload": {"results": results}})
 
     def handle_get_user_communities(self, conn, payload):
-        username = payload.get("username")
-        user_comms = community_repository.get_user_communities(username)
-        
+        comms = community_repository.get_user_communities(payload["username"])
         results = []
-        for comm in user_comms:
-            messages = get_messages(comm["messages_file"])
-            results.append({
-                "community_id": comm["community_id"],
-                "name": comm["name"],
-                "creator": comm["creator"],
-                "members": comm["members"],
-                "messages": messages[-50:]
-            })
-            
-        self.send_packet(conn, {
-            "type": "get_user_communities_response",
-            "payload": {"communities": results}
-        })
+        for c in comms:
+            results.append({"community_id": c["community_id"], "name": c["name"], "creator": c["creator"], "members": c["members"], "messages": get_messages(f"community_{c['community_id']}")[-50:]})
+        self.send_packet(conn, {"type": "get_user_communities_response", "payload": {"communities": results}})
+
+    def handle_update_private_key_backup(self, conn, payload):
+        success = update_private_key_backup(payload["username"], payload["encrypted_private_key"])
+        print(f"[E2EE] Private key backup sync: {success}")
+
+    def handle_star_message(self, conn, payload):
+        from database.starred_repository import add_starred_message
+        success = add_starred_message(payload)
+        self.send_packet(conn, {"type": "star_message_response", "payload": {"status": "success" if success else "fail"}})
+
+    def handle_get_starred_messages(self, conn, payload):
+        from database.starred_repository import get_user_starred_messages
+        msgs = get_user_starred_messages(payload["username"])
+        self.send_packet(conn, {"type": "get_starred_messages_response", "payload": {"messages": msgs}})
+
+    def handle_unstar(self, conn, payload):
+        from database.starred_repository import remove_starred_message
+        success = remove_starred_message(payload["message_id"], payload["username"])
+        self.send_packet(conn, {"type": "unstar_response", "payload": {"success": success}})
+
+
+if __name__ == "__main__":
+    ChatServer().start()

@@ -112,6 +112,17 @@ def update_public_key(username: str, public_key_pem: str) -> bool:
     return False
 
 
+def update_private_key_backup(username: str, encrypted_private_key: str) -> bool:
+    """Kullanıcının şifrelenmiş özel anahtar yedeğini kaydeder."""
+    users = read_json(FILENAME)
+    for user in users:
+        if user.get("username") == username:
+            user["encrypted_private_key"] = encrypted_private_key
+            write_json(FILENAME, users)
+            return True
+    return False
+
+
 def get_public_key(username: str) -> str | None:
     """Kullanıcının genel RSA anahtarını JSON dosyasından okur."""
     user = find_user(username)

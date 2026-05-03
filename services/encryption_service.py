@@ -7,6 +7,7 @@ warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -15,9 +16,10 @@ class EncryptionService(QObject):
     """
     Uçtan Uca Şifreleme (E2EE) servisi.
     RSA-2048 + AES-256-CFB hibrit şifreleme kullanır.
-    Özel anahtarlar yalnızca istemci cihazında saklanır; sunucu içeriği okuyamaz.
+    Özel anahtarlar şifrelenmiş yedekleme (Key Sync) desteğine sahiptir.
     """
     public_key_fetched_signal = pyqtSignal(dict)  # {"username": "...", "public_key": "..."}
+    private_key_restored_signal = pyqtSignal()  # Anahtar başarıyla geri yüklendiğinde
 
     def __init__(self, client, keys_dir="keys"):
         super().__init__()
@@ -90,6 +92,81 @@ class EncryptionService(QObject):
         self.public_key = None
         self.public_keys = {}
         print("[ŞİFRELEME] Servis sıfırlandı.")
+
+    # ─────────────────────────── ANAHTAR YEDEKLEME (SYNC) ───────────────────────
+
+    def _derive_key(self, password: str, salt: bytes) -> bytes:
+        """Şifreden PBKDF2 kullanarak AES anahtarı türetir."""
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+            backend=default_backend()
+        )
+        return kdf.derive(password.encode())
+
+    def backup_private_key(self, password: str) -> str | None:
+        """Özel anahtarı şifreyle kilitleyip base64 blob olarak döndürür."""
+        if not self.private_key:
+            return None
+
+        # 1. Özel anahtarı PEM formatına çevir
+        priv_pem = self.private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+
+        # 2. Şifreleme için Salt ve IV oluştur
+        salt = os.urandom(16)
+        iv = os.urandom(12) # GCM için 12 byte önerilir
+        
+        # 3. Anahtar türet ve AES-GCM ile şifrele
+        aes_key = self._derive_key(password, salt)
+        cipher = Cipher(algorithms.AES(aes_key), modes.GCM(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        ciphertext = encryptor.update(priv_pem) + encryptor.finalize()
+        tag = encryptor.tag
+
+        # 4. Paketi birleştir: salt(16) + iv(12) + tag(16) + ciphertext
+        encrypted_blob = salt + iv + tag + ciphertext
+        return base64.b64encode(encrypted_blob).decode("utf-8")
+
+    def restore_private_key(self, username: str, encrypted_b64: str, password: str) -> bool:
+        """Sunucudan gelen şifreli anahtarı çözer ve diske kaydeder."""
+        try:
+            encrypted_blob = base64.b64decode(encrypted_b64)
+            
+            # 1. Parçaları ayır
+            salt = encrypted_blob[:16]
+            iv = encrypted_blob[16:28]
+            tag = encrypted_blob[28:44]
+            ciphertext = encrypted_blob[44:]
+
+            # 2. Anahtar türet ve AES-GCM ile çöz
+            aes_key = self._derive_key(password, salt)
+            cipher = Cipher(algorithms.AES(aes_key), modes.GCM(iv, tag), backend=default_backend())
+            decryptor = cipher.decryptor()
+            priv_pem = decryptor.update(ciphertext) + decryptor.finalize()
+
+            # 3. Anahtarı doğrula ve yükle
+            self.private_key = serialization.load_pem_private_key(
+                priv_pem, password=None, backend=default_backend()
+            )
+            self.public_key = self.private_key.public_key()
+
+            # 4. Diske kaydet (Gelecekte şifre sormadan açmak için)
+            priv_path = os.path.join(self.keys_dir, f"private_{username}.pem")
+            with open(priv_path, "wb") as f:
+                f.write(priv_pem)
+
+            print(f"[ŞİFRELEME] {username} için anahtar senkronize edildi.")
+            self.private_key_restored_signal.emit()
+            return True
+        except Exception as e:
+            print(f"[ŞİFRELEME HATA] Anahtar geri yüklenemedi: {e}")
+            return False
 
     # ─────────────────────────── ŞİFRELEME / ÇÖZME ───────────────────────────
 

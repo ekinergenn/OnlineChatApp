@@ -118,16 +118,50 @@ class MainApplicationWindow(QMainWindow):
 
     def on_login_success(self, user_info: dict):
         """Login başarılı olunca çağrılır."""
-        self.current_user = user_info  # {"user_id": 1, "username": "nisa", ...}
+        self.current_user = user_info
         username = user_info.get("username", "")
+        password = user_info.get("password", "")
+        encrypted_backup = user_info.get("encrypted_private_key")
 
         self.main_page.current_username = username
-        print(f"[DEBUG] MainPageUI current_username set edildi: {username}")
-
         self.main_page.reset_ui()
 
-        # E2EE: RSA anahtar çiftini oluştur/yükle ve sunucuya genel anahtarı gönder
-        public_key_pem = self.encryption_service.generate_key_pair(username)
+        # E2EE: RSA anahtar yönetimi ve Senkronizasyon
+        print(f"[E2EE] Anahtar kontrolü yapılıyor: {username}")
+        
+        # 1. Lokal anahtarı yüklemeyi dene
+        public_key_pem = self.encryption_service.load_private_key(username)
+        
+        if public_key_pem:
+            print("[E2EE] Lokal anahtar başarıyla yüklendi.")
+            # Eğer sunucuda yedek yoksa ama bizde anahtar varsa, sunucuya yedekle (İlk kez E2EE kullananlar için)
+            if not encrypted_backup:
+                backup_blob = self.encryption_service.backup_private_key(password)
+                if backup_blob:
+                    self.chat_client.send_data({
+                        "type": "update_private_key_backup_request",
+                        "payload": {"username": username, "encrypted_private_key": backup_blob}
+                    })
+        else:
+            # 2. Lokal anahtar yok, sunucuda yedek var mı?
+            if encrypted_backup:
+                print("[E2EE] Lokal anahtar bulunamadı, sunucudaki yedek indiriliyor...")
+                success = self.encryption_service.restore_private_key(username, encrypted_backup, password)
+                if success:
+                    public_key_pem = self.encryption_service.get_public_key_pem()
+            
+            # 3. Hala anahtar yoksa (Yeni cihaz ve yedek yok), yeni oluştur ve yedekle
+            if not public_key_pem:
+                print("[E2EE] Anahtar bulunamadı, yeni anahtar çifti oluşturuluyor...")
+                public_key_pem = self.encryption_service.generate_key_pair(username)
+                backup_blob = self.encryption_service.backup_private_key(password)
+                if backup_blob:
+                    self.chat_client.send_data({
+                        "type": "update_private_key_backup_request",
+                        "payload": {"username": username, "encrypted_private_key": backup_blob}
+                    })
+
+        # Sunucuya her zaman güncel genel anahtarımızı bildir (Garanti olması için)
         if public_key_pem:
             self.encryption_service.send_update_public_key_request(username)
 
