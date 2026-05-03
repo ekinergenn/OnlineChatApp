@@ -105,7 +105,10 @@ class ChatServer:
         elif msg_type == "update_private_key_backup_request":
             self.handle_update_private_key_backup(conn, payload)
         elif msg_type == "login_request":
+            self._cleanup_conn_from_online(conn)
             self.handle_login(conn, payload)
+        elif msg_type == "logout_request":
+            self.handle_logout(conn, payload)
         elif msg_type == "register_request":
             self.handle_register(conn, payload)
         elif msg_type == "chat_message":
@@ -429,6 +432,29 @@ class ChatServer:
         success = remove_starred_message(payload["message_id"], payload["username"])
         self.send_packet(conn, {"type": "unstar_response", "payload": {"success": success}})
 
+
+    def handle_logout(self, conn, payload):
+        """Kullanıcıyı manuel olarak offline yapar."""
+        username = payload.get("username")
+        if username and username in self.online_users:
+            self._cleanup_conn_from_online(conn)
+            print(f"[ÇIKIŞ] {username} başarıyla çıkış yaptı.")
+
+    def _cleanup_conn_from_online(self, conn):
+        """Bir bağlantıya (socket) bağlı olan kullanıcıyı online listesinden temizler."""
+        user_to_remove = None
+        for username, socket in self.online_users.items():
+            if socket == conn:
+                user_to_remove = username
+                break
+        
+        if user_to_remove:
+            import time
+            self.last_seen[user_to_remove] = int(time.time())
+            if user_to_remove in self.online_users:
+                del self.online_users[user_to_remove]
+            self._broadcast_status(user_to_remove, "offline")
+            print(f"[TEMİZLİK] {user_to_remove} bağlantısı temizlendi (Offline).")
 
 if __name__ == "__main__":
     ChatServer().start()

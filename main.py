@@ -108,6 +108,13 @@ class MainApplicationWindow(QMainWindow):
         )
 
         if reply == QMessageBox.Yes:
+            # Sunucuya çıkış yaptığımızı bildir (Offline görünmek için)
+            if self.current_user:
+                self.chat_client.send_data({
+                    "type": "logout_request",
+                    "payload": {"username": self.current_user.get("username")}
+                })
+
             self.login_page.clear_fields()
             self.main_page.reset_ui()
             self.chat_controller.reset_user_data()
