@@ -29,6 +29,7 @@ class MainPageUI(QWidget):
     delete_chat_signal = pyqtSignal(str)
     block_user_signal = pyqtSignal(str)
     send_message_signal = pyqtSignal(str, str)
+    request_group_info_signal = pyqtSignal(str) # Yeni: (chat_id)
     send_image_signal = pyqtSignal(str, str)  # ← YENİ: (chat_name, image_path)
     load_history_signal = pyqtSignal(str)
     search_query_signal = pyqtSignal(str)
@@ -316,8 +317,8 @@ class MainPageUI(QWidget):
         
         if is_group:
             avatar.setCursor(QCursor(Qt.PointingHandCursor))
-            # Lambda ile members listesini o anki widget'tan çekerek gönderiyoruz
-            avatar.mousePressEvent = lambda e: self.show_group_members(contact_name, getattr(chat_frame, 'members', []))
+            # Sadece ismi gönderiyoruz, controller chat_id'yi bulup sunucuya soracak
+            avatar.mousePressEvent = lambda e: self.show_group_members(contact_name)
 
         name_col = QVBoxLayout()
         name_col.setSpacing(1)
@@ -1052,12 +1053,27 @@ class MainPageUI(QWidget):
         # 3. Hoş geldin ekranına dön
         self.chat_screens_stack.setCurrentIndex(0)
 
-    def show_group_members(self, group_name, members):
-        if not members:
-            QMessageBox.information(self, "Bilgi", "Grup üye bilgisi henüz yüklenmedi.")
-            return
-        dialog = GroupMembersDialog(group_name, members, self)
-        dialog.exec_()
+    def show_group_members(self, group_name):
+        # chat_id'yi bul ve sinyal fırlat
+        chat_id = None
+        for i in range(self.chat_screens_stack.count()):
+            w = self.chat_screens_stack.widget(i)
+            if getattr(w, 'contact_name', None) == group_name:
+                chat_id = getattr(w, 'current_chat_id', None)
+                break
+        
+        if chat_id:
+            self.request_group_info_signal.emit(chat_id)
+
+    def open_group_members_dialog(self, payload):
+        status = payload.get("status")
+        if status == "success":
+            group_name = payload.get("chat_name")
+            members = payload.get("members", [])
+            dialog = GroupMembersDialog(group_name, members, self)
+            dialog.exec_()
+        else:
+            QMessageBox.warning(self, "Hata", payload.get("message", "Grup bilgisi alınamadı."))
 
     def on_search_changed(self, text):
         print(f"[DEBUG] Arama kutusu değişti: {text}")

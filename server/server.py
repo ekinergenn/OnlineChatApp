@@ -119,6 +119,7 @@ class ChatServer:
         elif msg_type == "search_communities_request": self.handle_search_communities(conn, payload)
         elif msg_type == "get_user_communities_request": self.handle_get_user_communities(conn, payload)
         elif msg_type == "logout_request": self.handle_logout(conn, payload)
+        elif msg_type == "get_group_info_request": self.handle_get_group_info(conn, payload)
 
     def send_packet(self, conn, packet_dict):
         try:
@@ -347,6 +348,23 @@ class ChatServer:
         resp = {"type": "create_group_response", "payload": {"status": "success", "chat_id": chat_id, "group_name": payload["group_name"], "members": payload["members"]}}
         for m in payload["members"]:
             if m in self.online_users: self.send_packet(self.online_users[m], resp)
+
+    def handle_get_group_info(self, conn, payload):
+        chat_id = payload.get("chat_id")
+        all_chats = get_all_chats()
+        chat = get_chat_(all_chats, chat_id)
+        if chat:
+            self.send_packet(conn, {
+                "type": "get_group_info_response",
+                "payload": {
+                    "status": "success",
+                    "chat_id": chat_id,
+                    "chat_name": chat.get("chat_name"),
+                    "members": chat.get("members", [])
+                }
+            })
+        else:
+            self.send_packet(conn, {"type": "get_group_info_response", "payload": {"status": "fail", "message": "Grup bulunamadı"}})
 
     def handle_delete_chat(self, conn, payload):
         chat_id = payload.get("chat_id")

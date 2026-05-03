@@ -13,6 +13,7 @@ class ChatService(QObject):
     privacy_settings_loaded_signal = pyqtSignal(dict) # Yeni: (settings)
     update_privacy_response_signal = pyqtSignal(bool) # Yeni: (success)
     chat_deleted_notification_signal = pyqtSignal(str) # Yeni: (chat_name)
+    group_info_received_signal = pyqtSignal(dict) # Yeni: (payload)
 
     def __init__(self, client):
         super().__init__()
@@ -148,3 +149,12 @@ class ChatService(QObject):
         chat_name = payload.get("chat_name")
         if chat_name:
             self.chat_deleted_notification_signal.emit(chat_name)
+
+    def send_get_group_info_request(self, chat_id: str):
+        self.client.send_data({
+            "type": "get_group_info_request",
+            "payload": {"chat_id": chat_id}
+        })
+
+    def handle_get_group_info_response(self, payload: dict):
+        self.group_info_received_signal.emit(payload)

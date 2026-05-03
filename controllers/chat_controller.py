@@ -28,6 +28,7 @@ class ChatController():
         self.message_controller.message_service.messages_read_receipt_signal.connect(self.on_messages_read_received)
         self.chat_service.privacy_settings_loaded_signal.connect(self.on_privacy_settings_received)
         self.chat_service.chat_deleted_notification_signal.connect(self.main_page.remove_chat_from_ui)
+        self.chat_service.group_info_received_signal.connect(self.main_page.open_group_members_dialog)
         
         if self.block_service:
             self.block_service.block_status_changed_signal.connect(self.on_block_status_received)
@@ -52,6 +53,7 @@ class ChatController():
         self.main_page.update_privacy_settings_signal.connect(self.handle_update_privacy)
         self.main_page.get_privacy_settings_signal.connect(self.handle_get_privacy)
         self.main_page.mark_messages_read_signal.connect(self.handle_mark_messages_read)
+        self.main_page.request_group_info_signal.connect(self.chat_service.send_get_group_info_request)
 
     def disconnect_ui_signals(self):
         """UI sinyal bağlantılarını güvenli bir şekilde koparır."""
@@ -69,6 +71,7 @@ class ChatController():
             self.main_page.profile_page.delete_account_signal.disconnect()
             self.main_page.update_privacy_settings_signal.disconnect()
             self.main_page.get_privacy_settings_signal.disconnect()
+            self.main_page.request_group_info_signal.disconnect()
         except:
             pass
 
