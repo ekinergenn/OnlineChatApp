@@ -11,6 +11,7 @@ from PyQt5.QtGui import QFont, QCursor, QPixmap, QImage
 from ui.communitiesPage import CommunitiesPageUI
 from ui.settingsPage import SettingsPageUI
 from ui.profilePage import ProfilePageUI
+from ui.groupMembersDialog import GroupMembersDialog
 
 
 # Tıklanabilir sohbet listesi elemanları için özel QFrame sınıfı
@@ -312,6 +313,11 @@ class MainPageUI(QWidget):
         avatar.setFixedSize(40, 40)
         avatar.setStyleSheet("background-color: #dfe5e7; border-radius: 20px; font-size: 20px;")
         avatar.setAlignment(Qt.AlignCenter)
+        
+        if is_group:
+            avatar.setCursor(QCursor(Qt.PointingHandCursor))
+            # Lambda ile members listesini o anki widget'tan çekerek gönderiyoruz
+            avatar.mousePressEvent = lambda e: self.show_group_members(contact_name, getattr(chat_frame, 'members', []))
 
         name_col = QVBoxLayout()
         name_col.setSpacing(1)
@@ -1045,6 +1051,13 @@ class MainPageUI(QWidget):
 
         # 3. Hoş geldin ekranına dön
         self.chat_screens_stack.setCurrentIndex(0)
+
+    def show_group_members(self, group_name, members):
+        if not members:
+            QMessageBox.information(self, "Bilgi", "Grup üye bilgisi henüz yüklenmedi.")
+            return
+        dialog = GroupMembersDialog(group_name, members, self)
+        dialog.exec_()
 
     def on_search_changed(self, text):
         print(f"[DEBUG] Arama kutusu değişti: {text}")
