@@ -84,10 +84,6 @@ class SettingsPageUI(QWidget):
         self.scroll_layout.addWidget(self.yildiz_btn)
         self.gizlilik_btn = self.create_setting_button("🔐", "Gizlilik", "Engellenen kişiler, çevrimiçi bilgisi...", 2)
         self.scroll_layout.addWidget(self.gizlilik_btn)
-        self.bildirimler_btn = self.create_setting_button("🔔", "Bildirimler", "Mesaj sesleri ve grup uyarıları", 3)
-        self.scroll_layout.addWidget(self.bildirimler_btn)
-        self.tema = self.create_theme_toggle("🌓", "Karanlık Mod", "Gözlerinizi dinlendirin")  # indexi 4
-        self.scroll_layout.addWidget(self.tema)
         self.yardim_btn = self.create_setting_button("❓", "Yardım", "Yardım merkezi, bize ulaşın", 5)
         self.scroll_layout.addWidget(self.yardim_btn)
 

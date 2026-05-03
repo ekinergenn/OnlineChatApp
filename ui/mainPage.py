@@ -42,6 +42,7 @@ class MainPageUI(QWidget):
     get_privacy_settings_signal = pyqtSignal(str)
     request_blocked_users_signal = pyqtSignal()
     unblock_user_from_settings_signal = pyqtSignal(str)
+    leave_group_signal = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -579,7 +580,31 @@ class MainPageUI(QWidget):
         )
 
         if reply == QMessageBox.Yes:
-            self.delete_chat_signal.emit(chat_name)
+            if is_group:
+                # Burası kritik! handle_leave_group'u tetikleyecek olan sinyal:
+                self.leave_group_signal.emit(chat_name)
+            else:
+                self.delete_chat_signal.emit(chat_name)
+
+    def _add_existing_group_back(self, group_data):
+        chat_name = group_data.get("chat_name")
+        chat_id = group_data.get("chat_id")
+
+        # 1. Önce yeni bir UI alanı oluştur
+        self.add_new_chat_to_ui(chat_name, is_group=True)
+
+        # 2. Widget'ı bul ve chat_id'yi içine göm
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == chat_name:
+                widget.current_chat_id = chat_id
+                # 3. Geçmişi yüklemesi için sinyali tetikle
+                self.load_history_signal.emit(chat_name)
+                self.chat_screens_stack.setCurrentIndex(i)
+                break
+
+        self.clear_search_results()
+        self.search_input.clear()
 
     def add_new_chat_to_ui(self, chat_name, last_message="", is_group=False):
         # Mükerrer kontrolü: Zaten bu isimde bir chat varsa ekleme
@@ -1061,25 +1086,24 @@ class MainPageUI(QWidget):
         return item_frame
 
     def _add_existing_group_back(self, group_data):
-        # kullanıcının zaten üyesi olduğu grubu sol listeye geri getir
         chat_name = group_data.get("chat_name")
         chat_id = group_data.get("chat_id")
 
-        # eğer listede zaten varsa geçiş yap
+        # 1. Eğer arayüzde (sohbetlerde) zaten varsa sadece ona geç
         for i in range(self.chat_screens_stack.count()):
             widget = self.chat_screens_stack.widget(i)
             if getattr(widget, 'contact_name', None) == chat_name:
                 self.switch_to_chat(chat_name)
                 return
 
-        # yoksa yeniymiş gibi ekle
+        # 2. Arayüzde yoksa (silinmiş/gizlenmişse) yeniymiş gibi ekle
         self.add_new_chat_to_ui(chat_name, is_group=True)
-        for i in range(self.chat_screens_stack.count()):
-            widget = self.chat_screens_stack.widget(i)
-            if getattr(widget, 'contact_name', None) == chat_name:
-                widget.current_chat_id = chat_id
-                break
 
+        # 3. Son eklenen widget'a chat_id'yi geri ver
+        last_widget = self.chat_screens_stack.widget(self.chat_screens_stack.count() - 1)
+        last_widget.current_chat_id = chat_id
+
+        # 4. Arama kutusunu temizle ve o sohbete odaklan
         self.clear_search_results()
         self.search_input.clear()
         self.switch_to_chat(chat_name)

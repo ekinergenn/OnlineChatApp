@@ -45,6 +45,7 @@ class ChatController():
         self.main_page.request_all_users_signal.connect(self.handle_request_all_users)
         self.main_page.create_group_signal.connect(self.handle_create_group)
         self.main_page.profile_page.update_profile_signal.connect(self.handle_update_profile)
+        self.main_page.leave_group_signal.connect(self.handle_leave_group)
 
     def disconnect_ui_signals(self):
         """UI sinyal bağlantılarını güvenli bir şekilde koparır."""
@@ -258,28 +259,64 @@ class ChatController():
 
     # TAMAMEN YENİ FONKSİYON
     def handle_delete_chat(self, chat_name: str):
-        chat_id = None
-        for i in range(self.main_page.chat_screens_stack.count()):
-            widget = self.main_page.chat_screens_stack.widget(i)
-            if getattr(widget, 'contact_name', None) == chat_name:
-                chat_id = getattr(widget, 'current_chat_id', None)
-                break
+        # İŞTE BURADA ÇAĞIRIYORUZ:
+        chat_id = self.get_chat_id_by_name(chat_name)
 
         if not chat_id:
+            # Eğer bellekte ID yoksa (örneğin sadece arama sonucu açılmış ama mesaj atılmamış)
+            # sadece arayüzden kaldırıyoruz.
             self.main_page.remove_chat_from_ui(chat_name)
             return
 
-        self.chat_service.send_delete_chat_request(chat_id, chat_name, self.current_username)
+        # ID bulundu, şimdi servise aksiyonu bildiriyoruz
+        self.chat_service.send_delete_chat_request(
+            chat_id=chat_id,
+            chat_name=chat_name,
+            username=self.current_username,
+            action="delete"  # 'delete' sunucuda hide_group_chat'i tetikler
+        )
+
+    def handle_leave_group(self, chat_name: str):
+        # İŞTE BURADA ÇAĞIRIYORUZ:
+        chat_id = self.get_chat_id_by_name(chat_name)
+
+        if chat_id:
+            # Sunucuya aksiyonu 'leave' olarak gönderiyoruz
+            self.chat_service.send_delete_chat_request(
+                chat_id=chat_id,
+                chat_name=chat_name,
+                username=self.current_username,
+                action="leave"  # 'leave' sunucuda leave_group_chat'i tetikler
+            )
+
+    def get_chat_id_by_name(self, chat_name):
+        """Arayüzdeki chat_screens_stack içinden isme göre chat_id bulur."""
+        for i in range(self.main_page.chat_screens_stack.count()):
+            widget = self.main_page.chat_screens_stack.widget(i)
+            # Widget'ın ismini kontrol et
+            if getattr(widget, 'contact_name', None) == chat_name:
+                # O widget'a gömülü olan chat_id'yi al
+                chat_id = getattr(widget, 'current_chat_id', None)
+                if chat_id:
+                    return chat_id
+
+        print(f"[UYARI] '{chat_name}' ismi için chat_id bulunamadı.")
+        return None
 
     # TAMAMEN YENİ FONKSİYON
     def on_chat_deleted(self, payload: dict):
         status = payload.get("status")
         chat_name = payload.get("chat_name")
+        action = payload.get("action")
 
         if status == "success" and chat_name:
+            # Arayüzden kaldır (Hem gizlemede hem ayrılmada UI'dan kalkmalı)
             self.main_page.remove_chat_from_ui(chat_name)
+
+            if action == "leave":
+                QMessageBox.information(self.main_page, "Bilgi", f"'{chat_name}' grubundan ayrıldınız.")
         else:
-            QMessageBox.warning(self.main_page, "Hata", "Sohbet silinemedi.")
+            QMessageBox.warning(self.main_page, "Hata", "İşlem tamamlanamadı.")
 
     def handle_delete_account(self):
         # LogRegService üzerinden sunucuya istek gönder

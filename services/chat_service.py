@@ -56,11 +56,16 @@ class ChatService(QObject):
         results = payload.get("results", [])
         self.search_results_signal.emit(results)
 
-    def send_delete_chat_request(self, chat_id: str, chat_name: str, username: str = ""):
+    def send_delete_chat_request(self, chat_id: str, chat_name: str, username: str, action: str = "delete"):
         self._pending_delete_chat_name = chat_name
         packet = {
             "type": "delete_chat_request",
-            "payload": {"chat_id": chat_id, "username": username}
+            "payload": {
+                "chat_id": chat_id,
+                "chat_name": chat_name,
+                "username": username,
+                "action": action  # Sunucuya ne yapacağını söyler
+            }
         }
         self.client.send_data(packet)
 
