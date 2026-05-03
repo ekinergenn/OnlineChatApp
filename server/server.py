@@ -328,8 +328,31 @@ class ChatServer:
             if m in self.online_users: self.send_packet(self.online_users[m], resp)
 
     def handle_delete_chat(self, conn, payload):
-        success = delete_chat(payload["chat_id"])
-        self.send_packet(conn, {"type": "delete_chat_response", "payload": {"status": "success" if success else "fail", "chat_id": payload["chat_id"]}})
+        chat_id = payload["chat_id"]
+        username = payload.get("username")
+        chat_name = payload.get("chat_name")
+
+        from database.chat_repository import get_all_chats, get_chat_, leave_group_chat, delete_chat
+
+        all_chats = get_all_chats()
+        chat_obj = get_chat_(all_chats, chat_id)
+
+        if chat_obj and chat_obj.get("is_group", False):
+            # YENİ: Grubu silme, sadece üyeyi çıkar
+            success = leave_group_chat(chat_id, username)
+        else:
+            # ESKİ: İkili sohbeti tamamen temizle (veya isteğe göre sadece kendi tarafını sil)
+            success = delete_chat(chat_id)
+
+        # Yanıtı gönder
+        self.send_packet(conn, {
+            "type": "delete_chat_response",
+            "payload": {
+                "status": "success" if success else "fail",
+                "chat_id": chat_id,
+                "chat_name": chat_name
+            }
+        })
 
     def handle_search_users(self, conn, payload):
         results = search_users(payload["query"], payload.get("username"))
