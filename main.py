@@ -118,6 +118,7 @@ class MainApplicationWindow(QMainWindow):
             self.login_page.clear_fields()
             self.main_page.reset_ui()
             self.chat_controller.reset_user_data()
+            self.community_controller.reset() # Topluluk sinyallerini temizle
             self.message_controller.reset_user_data()
             self.encryption_service.reset()  # Anahtarları ve önbelleği temizle
             self.stacked_widget.setCurrentIndex(0)
