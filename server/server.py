@@ -177,6 +177,7 @@ class ChatServer:
                     "email": user["email"],
                     "tel": user["tel"],
                     "encrypted_private_key": user.get("encrypted_private_key"),
+                    "public_key": user.get("public_key"),
                     "user_id": user["user_id"]
                 }
             }

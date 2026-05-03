@@ -129,40 +129,50 @@ class MainApplicationWindow(QMainWindow):
         # E2EE: RSA anahtar yönetimi ve Senkronizasyon
         print(f"[E2EE] Anahtar kontrolü yapılıyor: {username}")
         
-        # 1. Lokal anahtarı yüklemeyi dene
-        public_key_pem = self.encryption_service.load_private_key(username)
+        server_pub_key = user_info.get("public_key")
         
-        if public_key_pem:
-            print("[E2EE] Lokal anahtar başarıyla yüklendi.")
-            # Eğer sunucuda yedek yoksa ama bizde anahtar varsa, sunucuya yedekle (İlk kez E2EE kullananlar için)
-            if not encrypted_backup:
-                backup_blob = self.encryption_service.backup_private_key(password)
-                if backup_blob:
-                    self.chat_client.send_data({
-                        "type": "update_private_key_backup_request",
-                        "payload": {"username": username, "encrypted_private_key": backup_blob}
-                    })
+        # 1. Lokal anahtarı yüklemeyi dene
+        local_pub_key = self.encryption_service.load_private_key(username)
+        
+        should_restore = False
+        if local_pub_key:
+            # ÖNEMLİ: Lokal anahtar var ama sunucudaki ile aynı mı?
+            if server_pub_key and local_pub_key.strip() != server_pub_key.strip():
+                print("[E2EE] UYARI: Lokal anahtar sunucudaki ile eşleşmiyor! Senkronizasyon gerekiyor.")
+                should_restore = True
+            else:
+                print("[E2EE] Lokal anahtar doğrulandı ve yüklendi.")
+                # Sunucuda yedek yoksa yedekle
+                if not encrypted_backup:
+                    backup_blob = self.encryption_service.backup_private_key(password)
+                    if backup_blob:
+                        self.chat_client.send_data({
+                            "type": "update_private_key_backup_request",
+                            "payload": {"username": username, "encrypted_private_key": backup_blob}
+                        })
         else:
-            # 2. Lokal anahtar yok, sunucuda yedek var mı?
-            if encrypted_backup:
-                print("[E2EE] Lokal anahtar bulunamadı, sunucudaki yedek indiriliyor...")
-                success = self.encryption_service.restore_private_key(username, encrypted_backup, password)
-                if success:
-                    public_key_pem = self.encryption_service.get_public_key_pem()
-            
-            # 3. Hala anahtar yoksa (Yeni cihaz ve yedek yok), yeni oluştur ve yedekle
-            if not public_key_pem:
-                print("[E2EE] Anahtar bulunamadı, yeni anahtar çifti oluşturuluyor...")
-                public_key_pem = self.encryption_service.generate_key_pair(username)
-                backup_blob = self.encryption_service.backup_private_key(password)
-                if backup_blob:
-                    self.chat_client.send_data({
-                        "type": "update_private_key_backup_request",
-                        "payload": {"username": username, "encrypted_private_key": backup_blob}
-                    })
+            should_restore = True
 
-        # Sunucuya her zaman güncel genel anahtarımızı bildir (Garanti olması için)
-        if public_key_pem:
+        # 2. Geri yükleme (Restore) gerekiyorsa ve yedek varsa yap
+        if should_restore and encrypted_backup:
+            print("[E2EE] Sunucudaki şifreli yedek indiriliyor ve geri yükleniyor...")
+            success = self.encryption_service.restore_private_key(username, encrypted_backup, password)
+            if success:
+                local_pub_key = self.encryption_service.get_public_key_pem()
+            
+        # 3. Hala anahtar yoksa (Yeni cihaz ve yedek yok), yeni oluştur ve yedekle
+        if not local_pub_key:
+            print("[E2EE] Hiç anahtar bulunamadı, yeni anahtar çifti oluşturuluyor...")
+            local_pub_key = self.encryption_service.generate_key_pair(username)
+            backup_blob = self.encryption_service.backup_private_key(password)
+            if backup_blob:
+                self.chat_client.send_data({
+                    "type": "update_private_key_backup_request",
+                    "payload": {"username": username, "encrypted_private_key": backup_blob}
+                })
+
+        # Sunucuya her zaman güncel genel anahtarımızı bildir
+        if local_pub_key:
             self.encryption_service.send_update_public_key_request(username)
 
         self.chat_controller.set_current_user(user_info)
