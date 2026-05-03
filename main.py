@@ -175,6 +175,9 @@ class MainApplicationWindow(QMainWindow):
         if local_pub_key:
             self.encryption_service.send_update_public_key_request(username)
 
+        # UI Sinyallerini tazele (Logout sonrası temizlenenleri geri bağla)
+        self.chat_controller.connect_ui_signals()
+
         self.chat_controller.set_current_user(user_info)
         self.message_controller.set_current_user(user_info)
         self.community_controller.set_current_user(user_info)

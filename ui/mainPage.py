@@ -582,6 +582,13 @@ class MainPageUI(QWidget):
             self.delete_chat_signal.emit(chat_name)
 
     def add_new_chat_to_ui(self, chat_name, last_message="", is_group=False):
+        # Mükerrer kontrolü: Zaten bu isimde bir chat varsa ekleme
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
+                self.chat_screens_stack.setCurrentIndex(i)
+                return
+
         new_stack_index = self.chat_screens_stack.count()
         new_chat_item = self.create_chat_item(
             name=chat_name,

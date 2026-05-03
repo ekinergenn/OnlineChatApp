@@ -13,31 +13,55 @@ class ChatController():
         self.current_username = None
         self.loaded_chats = set()
 
-        # Signal connections
-        self.main_page.block_user_signal.connect(self.handle_block_user)
-        self.main_page.search_query_signal.connect(self.handle_search)
-        self.main_page.start_chat_signal.connect(self.handle_start_chat)
-        self.main_page.delete_chat_signal.connect(self.handle_delete_chat)
-        self.main_page.profile_page.delete_account_signal.connect(self.handle_delete_account)
+        self.init_signals()
+        self.connect_ui_signals()
 
-        self.main_page.load_history_signal.connect(self.handle_chat_opened)
-
-        # Service signals
+    def init_signals(self):
+        """Servislerden gelen sinyalleri bağlar (Sabit bağlantılar)."""
         self.chat_service.user_chats_loaded_signal.connect(self.load_user_chats)
         self.chat_service.search_results_signal.connect(self.main_page.show_search_results)
         self.chat_service.create_chat_response_signal.connect(self.on_chat_created)
         self.chat_service.delete_chat_response_signal.connect(self.on_chat_deleted)
         self.chat_service.user_status_signal.connect(self.on_user_status_received)
+        self.chat_service.all_users_loaded_signal.connect(self.on_all_users_loaded)
+        self.chat_service.create_group_response_signal.connect(self.on_group_created)
+        
         if self.block_service:
             self.block_service.block_status_changed_signal.connect(self.on_block_status_received)
             self.block_service.block_list_loaded_signal.connect(self.on_block_list_loaded)
-        self.chat_service.all_users_loaded_signal.connect(self.on_all_users_loaded)
+
+    def connect_ui_signals(self):
+        """UI'dan gelen sinyalleri bağlar (Logout/Login döngüsünde yenilenir)."""
+        self.disconnect_ui_signals() # Önce temizle
+        
+        self.main_page.block_user_signal.connect(self.handle_block_user)
+        self.main_page.search_query_signal.connect(self.handle_search)
+        self.main_page.start_chat_signal.connect(self.handle_start_chat)
+        self.main_page.delete_chat_signal.connect(self.handle_delete_chat)
+        self.main_page.profile_page.delete_account_signal.connect(self.handle_delete_account)
+        self.main_page.load_history_signal.connect(self.handle_chat_opened)
         self.main_page.request_blocked_users_signal.connect(self.handle_request_blocked_users)
         self.main_page.unblock_user_from_settings_signal.connect(self.handle_unblock_from_settings)
-        self.chat_service.create_group_response_signal.connect(self.on_group_created)
         self.main_page.request_all_users_signal.connect(self.handle_request_all_users)
         self.main_page.create_group_signal.connect(self.handle_create_group)
         self.main_page.profile_page.update_profile_signal.connect(self.handle_update_profile)
+
+    def disconnect_ui_signals(self):
+        """UI sinyal bağlantılarını güvenli bir şekilde koparır."""
+        try:
+            self.main_page.block_user_signal.disconnect()
+            self.main_page.search_query_signal.disconnect()
+            self.main_page.start_chat_signal.disconnect()
+            self.main_page.delete_chat_signal.disconnect()
+            self.main_page.load_history_signal.disconnect()
+            self.main_page.request_blocked_users_signal.disconnect()
+            self.main_page.unblock_user_from_settings_signal.disconnect()
+            self.main_page.request_all_users_signal.disconnect()
+            self.main_page.create_group_signal.disconnect()
+            self.main_page.profile_page.update_profile_signal.disconnect()
+            self.main_page.profile_page.delete_account_signal.disconnect()
+        except:
+            pass
 
     def handle_chat_opened(self, chat_name: str):
         for i in range(self.main_page.chat_screens_stack.count()):
@@ -310,6 +334,9 @@ class ChatController():
         self.current_user_id = None
         self.loaded_chats = set()
 
+        # Sinyal bağlantılarını temizle (Mükerrer UI oluşumunu engellemek için)
+        self.disconnect_ui_signals()
+
         # ChatService temizliği
         if hasattr(self, 'chat_service') and self.chat_service is not None:
             self.chat_service.reset()
@@ -318,4 +345,4 @@ class ChatController():
         if hasattr(self, 'chatbot_service') and self.chatbot_service is not None:
             self.chatbot_service.reset_conversation()
 
-        print("[CONTROLLER] Kullanıcı verileri temizlendi.")
+        print("[CONTROLLER] Kullanıcı verileri ve sinyal bağlantıları temizlendi.")
