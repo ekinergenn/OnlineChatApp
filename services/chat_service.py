@@ -12,6 +12,7 @@ class ChatService(QObject):
     messages_read_signal = pyqtSignal(dict) # Yeni: (chat_id, message_ids, read_by)
     privacy_settings_loaded_signal = pyqtSignal(dict) # Yeni: (settings)
     update_privacy_response_signal = pyqtSignal(bool) # Yeni: (success)
+    chat_deleted_notification_signal = pyqtSignal(str) # Yeni: (chat_name)
 
     def __init__(self, client):
         super().__init__()
@@ -142,3 +143,8 @@ class ChatService(QObject):
 
     def handle_messages_read(self, payload: dict):
         self.messages_read_signal.emit(payload)
+
+    def handle_chat_deleted_notification(self, payload: dict):
+        chat_name = payload.get("chat_name")
+        if chat_name:
+            self.chat_deleted_notification_signal.emit(chat_name)

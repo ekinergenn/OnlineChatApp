@@ -106,5 +106,8 @@ class MessageHandler:
         elif msg_type == "community_message":
             self.services['community_service'].handle_server_response("community_message", payload)
 
+        elif msg_type == "chat_deleted_notification":
+            self.services['chat_service'].handle_chat_deleted_notification(payload)
+
         else:
             print(f"[UYARI] Bilinmeyen paket türü: {msg_type}")

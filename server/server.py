@@ -351,6 +351,18 @@ class ChatServer:
             }
         })
 
+        # Eğer ikili sohbet silindiyse diğer kullanıcıyı bilgilendir
+        if success and chat_obj and not chat_obj.get("is_group"):
+            for m in chat_obj.get("members", []):
+                if m != username and m in self.online_users:
+                    self.send_packet(self.online_users[m], {
+                        "type": "chat_deleted_notification",
+                        "payload": {
+                            "chat_id": chat_id,
+                            "chat_name": username  # Sileyen kişi, diğerinin listesinde chat_name olarak görünür
+                        }
+                    })
+
     def handle_search_users(self, conn, payload):
         query = payload.get("query", "").lower()
         requester = payload.get("username", "")

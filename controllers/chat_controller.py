@@ -27,6 +27,7 @@ class ChatController():
         self.chat_service.create_group_response_signal.connect(self.on_group_created)
         self.message_controller.message_service.messages_read_receipt_signal.connect(self.on_messages_read_received)
         self.chat_service.privacy_settings_loaded_signal.connect(self.on_privacy_settings_received)
+        self.chat_service.chat_deleted_notification_signal.connect(self.main_page.remove_chat_from_ui)
         
         if self.block_service:
             self.block_service.block_status_changed_signal.connect(self.on_block_status_received)
