@@ -589,19 +589,44 @@ class MainPageUI(QWidget):
     def _add_existing_group_back(self, group_data):
         chat_name = group_data.get("chat_name")
         chat_id = group_data.get("chat_id")
+        members = group_data.get("members", [])
 
-        # 1. Önce yeni bir UI alanı oluştur
+        # 1. Eğer arayüzde sol listede zaten varsa, silip yeniden ekleyelim (UI Tazeleme garantisi)
+        for i in range(self.scroll_layout.count()):
+            item = self.scroll_layout.itemAt(i)
+            if item and item.widget():
+                w = item.widget()
+                if getattr(w, 'contact_name', None) == chat_name:
+                    self.scroll_layout.removeWidget(w)
+                    w.deleteLater()
+                    break
+
+        # 2. Sağ taraftaki stack'te (mesaj ekranı) varsa onu da temizleyelim ki sıfırdan yüklensin
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            if getattr(widget, 'contact_name', None) == chat_name:
+                self.chat_screens_stack.removeWidget(widget)
+                widget.deleteLater()
+                break
+
+        # 3. Şimdi temiz bir şekilde yeniden ekle
         self.add_new_chat_to_ui(chat_name, is_group=True)
 
-        # 2. Widget'ı bul ve chat_id'yi içine göm
+        # 4. Yeni oluşturulan widget'ı bul ve verileri enjekte et
         for i in range(self.chat_screens_stack.count()):
             widget = self.chat_screens_stack.widget(i)
             if getattr(widget, 'contact_name', None) == chat_name:
                 widget.current_chat_id = chat_id
-                # 3. Geçmişi yüklemesi için sinyali tetikle
-                self.load_history_signal.emit(chat_name)
+                widget.is_group = True
+                widget.members = members
+
+                # Ekranı bu gruba odakla
                 self.chat_screens_stack.setCurrentIndex(i)
                 break
+
+        # 5. KRİTİK: Arama kutusunu kapatmadan ÖNCE geçmişi yükle sinyalini gönder
+        # Bu sinyal ChatController -> ChatService -> Server yolunu izleyip mesajları getirir
+        self.load_history_signal.emit(chat_name)
 
         self.clear_search_results()
         self.search_input.clear()
@@ -626,7 +651,6 @@ class MainPageUI(QWidget):
         self.scroll_layout.insertWidget(0, new_chat_item)
         new_chat_screen = self.create_individual_chat_screen(chat_name, is_group=is_group)
         self.chat_screens_stack.addWidget(new_chat_screen)
-        self.chat_screens_stack.setCurrentIndex(new_stack_index)
 
     def on_attach_clicked(self, chat_name):
         file_path, _ = QFileDialog.getOpenFileName(

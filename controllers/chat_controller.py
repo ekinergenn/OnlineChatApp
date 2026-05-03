@@ -67,24 +67,39 @@ class ChatController():
     def handle_chat_opened(self, chat_name: str):
         for i in range(self.main_page.chat_screens_stack.count()):
             widget = self.main_page.chat_screens_stack.widget(i)
+
             if getattr(widget, 'contact_name', None) == chat_name:
+                chat_id = getattr(widget, 'current_chat_id', None)
                 is_group = getattr(widget, 'is_group', False)
                 enc = getattr(self.message_controller, 'encryption_service', None)
 
+                # --- 1. KOŞULLU YÜKLEME (DÖNGÜYÜ KIRAN KISIM) ---
+                # Mesaj sayısını kontrol edelim. Sadece stretch varsa (count <= 1) sunucudan isteyelim.
+                # Böylece mesajlar zaten ekrandaysa tekrar istek atıp UI'ı tazelemeyiz.
+                if hasattr(widget, 'msg_layout'):
+                    msg_count = widget.msg_layout.count()
+                    if msg_count <= 1 and self.current_username:
+                        print(f"[DEBUG] {chat_name} boş görünüyor, geçmiş yükleniyor...")
+                        self.chat_service.send_get_user_chats_request(self.current_username)
+
+                # --- 2. DURUM VE ANAHTAR İŞLEMLERİ (Sessiz Çalışır) ---
                 if not is_group and chat_name != "__chatbot__":
                     from PyQt5.QtCore import QTimer
-                    QTimer.singleShot(100, lambda u=chat_name: self.chat_service.send_get_user_status_request(u))
-                    # E2EE: 1-1 sohbette alıcının anahtarını tazele
+                    # Timer kullanımı UI'ın donmasını engeller
+                    QTimer.singleShot(150, lambda u=chat_name: self.chat_service.send_get_user_status_request(u))
+
                     if enc:
-                        QTimer.singleShot(200, lambda u=chat_name: enc.send_get_public_key_request(u))
+                        QTimer.singleShot(250, lambda u=chat_name: enc.send_get_public_key_request(u))
 
                 elif is_group and enc:
-                    # E2EE: Grup sohbeti açılınca tüm üyelerin eksik anahtarlarını çek
                     members = getattr(widget, 'members', [])
                     other_members = [m for m in members if m != self.current_username]
-                    from PyQt5.QtCore import QTimer
-                    QTimer.singleShot(200, lambda m=other_members: enc.fetch_missing_group_keys(m))
+                    if other_members:
+                        from PyQt5.QtCore import QTimer
+                        QTimer.singleShot(250, lambda m=other_members: enc.fetch_missing_group_keys(m))
 
+                # --- 3. UI KONTROL ---
+                widget.update()
                 break
 
     def set_current_user(self, profile: dict):
@@ -316,7 +331,8 @@ class ChatController():
             if action == "leave":
                 QMessageBox.information(self.main_page, "Bilgi", f"'{chat_name}' grubundan ayrıldınız.")
         else:
-            QMessageBox.warning(self.main_page, "Hata", "İşlem tamamlanamadı.")
+            # QMessageBox.warning(self.main_page, "Hata", "İşlem tamamlanamadı.")
+            pass
 
     def handle_delete_account(self):
         # LogRegService üzerinden sunucuya istek gönder
