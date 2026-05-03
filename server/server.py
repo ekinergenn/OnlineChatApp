@@ -328,36 +328,79 @@ class ChatServer:
             if m in self.online_users: self.send_packet(self.online_users[m], resp)
 
     def handle_delete_chat(self, conn, payload):
-        chat_id = payload["chat_id"]
+        chat_id = payload.get("chat_id")
         username = payload.get("username")
-        chat_name = payload.get("chat_name")
+        chat_name = payload.get("chat_name") # Bu satırı ekle
+        action = payload.get("action", "delete")
 
-        from database.chat_repository import get_all_chats, get_chat_, leave_group_chat, delete_chat
+        from database.chat_repository import get_all_chats, get_chat_, leave_group_chat, hide_group_chat, delete_chat
 
         all_chats = get_all_chats()
         chat_obj = get_chat_(all_chats, chat_id)
 
-        if chat_obj and chat_obj.get("is_group", False):
-            # YENİ: Grubu silme, sadece üyeyi çıkar
-            success = leave_group_chat(chat_id, username)
+        success = False
+        if chat_obj and chat_obj.get("is_group"):
+            if action == "leave":
+                success = leave_group_chat(chat_id, username)
+            else:
+                success = hide_group_chat(chat_id, username)
         else:
-            # ESKİ: İkili sohbeti tamamen temizle (veya isteğe göre sadece kendi tarafını sil)
             success = delete_chat(chat_id)
 
-        # Yanıtı gönder
+        # BURASI KRİTİK: chat_name'i geri gönderiyoruz
         self.send_packet(conn, {
             "type": "delete_chat_response",
             "payload": {
                 "status": "success" if success else "fail",
                 "chat_id": chat_id,
-                "chat_name": chat_name
+                "chat_name": chat_name, # UI bunu bekliyor
+                "action": action
             }
         })
 
     def handle_search_users(self, conn, payload):
-        results = search_users(payload["query"], payload.get("username"))
-        sanitized = [{"username": u["username"], "fullname": u["fullname"], "user_id": u["user_id"]} for u in results]
-        self.send_packet(conn, {"type": "search_users_response", "payload": {"status": "success", "results": sanitized}})
+        query = payload.get("query", "").lower()
+        requester = payload.get("username", "")
+
+        # 1. Önce kullanıcıları tara (Mevcut mantık)
+        results = search_users(query, exclude_username=requester)
+        sanitized_results = []
+
+        for u in results:
+            sanitized_results.append({
+                "is_group": False,
+                "username": u.get("username"),
+                "fullname": u.get("fullname"),
+                "user_id": u.get("user_id")
+            })
+
+        # 2. Grupları tara ve kullanıcının üye olduklarını ekle
+        from database.chat_repository import get_all_chats
+        all_chats = get_all_chats()
+
+        if isinstance(all_chats, list):
+            for chat in all_chats:
+                # ŞART: Grup olmalı VE kullanıcı bu grubun üyeleri arasında olmalı
+                if chat.get("is_group") is True and requester in chat.get("members", []):
+                    chat_name = chat.get("chat_name", "")
+
+                    # Arama sorgusu grup adında geçiyor mu?
+                    if query in chat_name.lower():
+                        sanitized_results.append({
+                            "is_group": True,
+                            "chat_id": chat.get("chat_id"),
+                            "chat_name": chat_name,
+                            "members": chat.get("members")
+                        })
+
+        # 3. Birleştirilmiş sonuçları gönder
+        self.send_packet(conn, {
+            "type": "search_users_response",
+            "payload": {
+                "status": "success",
+                "results": sanitized_results
+            }
+        })
 
     def handle_get_all_users(self, conn, payload):
         from database.user_repository import get_all_users
