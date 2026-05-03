@@ -73,6 +73,9 @@ class MessageController:
     def handle_unstar_response(self, payload):
         """Sunucudan silme onayı geldiğinde tüm listeyi tazeler."""
         if payload.get("success"):
+            msg_id = str(payload.get("message_id"))
+            if hasattr(self, 'user_starred_ids'):
+                self.user_starred_ids.discard(msg_id)
             print(f"[DEBUG] Silme başarılı, liste tazeleniyor...")
 
             #arayüzü temizle
@@ -81,6 +84,8 @@ class MessageController:
             #sunucudan güncel listeyi tekrar iste
             if self.current_username:
                 self.message_service.send_get_starred_messages(self.current_username)
+
+            self.refresh_star_icons()
 
     def handle_get_starred_messages(self, username):
         print(f">>> CONTROLLER: {username} için sunucuya istek paketi gönderiliyor...")
@@ -582,6 +587,9 @@ class MessageController:
                     widget.unread_message_ids = []
 
                 self.main_page.update_chat_unread_count(chat_name, 0)
+
+                self.refresh_star_icons()
+                
                 break
 
     # ───────────────────────── OKUNDU MAKBUZİ ────────────────────────────────
