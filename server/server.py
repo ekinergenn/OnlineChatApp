@@ -263,9 +263,23 @@ class ChatServer:
                             filtered_read_by.append(reader)
                     msg["read_by"] = filtered_read_by
 
+                # Diğer kullanıcı ID'sini ve engelleme durumunu hesapla
+                other_user_id = None
+                block_status = "none"
+                if not chat_obj.get("is_group") and len(chat_obj["members"]) == 2:
+                    other_name = [m for m in chat_obj["members"] if m != username][0]
+                    ou = find_user(other_name)
+                    if ou:
+                        other_user_id = ou["user_id"]
+                        me = find_user(username)
+                        if me:
+                            block_status = block_repository.check_block_status(me["user_id"], other_user_id)
+
                 results.append({
                     "chat_id": cid,
                     "chat_name": chat_obj.get("chat_name") or ([m for m in chat_obj["members"] if m != username][0] if len(chat_obj["members"])==2 else cid),
+                    "other_user_id": other_user_id,
+                    "block_status": block_status,
                     "messages": messages,
                     "members": chat_obj["members"],
                     "is_group": chat_obj.get("is_group", False)
@@ -277,7 +291,22 @@ class ChatServer:
         chat_id = f"chat_{int(time.time())}"
         create_chat(chat_id, members, is_group=False)
         write_json(f"messages/{chat_id}.json", [])
-        self.send_packet(conn, {"type": "create_chat_response", "payload": {"status": "success", "chat_id": chat_id, "target_username": members[1] if len(members)>1 else ""}})
+        
+        other_user_id = None
+        if len(members) > 1:
+            target_user = find_user(members[1])
+            if target_user:
+                other_user_id = target_user.get("user_id")
+
+        self.send_packet(conn, {
+            "type": "create_chat_response", 
+            "payload": {
+                "status": "success", 
+                "chat_id": chat_id, 
+                "target_username": members[1] if len(members)>1 else "",
+                "other_user_id": other_user_id
+            }
+        })
 
     def handle_create_group(self, conn, payload):
         chat_id = f"group_{int(time.time())}"
@@ -319,8 +348,41 @@ class ChatServer:
         self.send_packet(conn, {"type": "get_all_users_response", "payload": {"status": "success", "users": sanitized}})
 
     def handle_block(self, conn, payload, status):
-        block_repository.add_or_update_block(payload["blocker_id"], payload["blocked_id"], status)
-        self.send_packet(conn, {"type": "block_user_response", "payload": {"status": "success", "is_blocked": status, "blocker_id": payload["blocker_id"], "blocked_id": payload["blocked_id"]}})
+        blocker_id = payload.get("blocker_id")
+        blocked_id = payload.get("blocked_id")
+        
+        if blocker_id and blocked_id:
+            block_repository.add_or_update_block(blocker_id, blocked_id, status)
+            
+            # Güncel durumu hesapla
+            block_status = block_repository.check_block_status(blocker_id, blocked_id)
+            
+            response = {
+                "type": "block_user_response",
+                "payload": {
+                    "status": "success",
+                    "blocker_id": blocker_id,
+                    "blocked_id": blocked_id,
+                    "block_status": block_status
+                }
+            }
+            self.send_packet(conn, response)
+            
+            # Eğer karşı taraf da online ise ona da durumu bildir
+            # (Engellendiğini anında anlaması için)
+            blocked_user = next((u for u, data in self.online_users.items() if find_user(u) and str(find_user(u)["user_id"]) == str(blocked_id)), None)
+            if blocked_user:
+                # Karşı taraf için durumu tekrar hesapla (onun perspektifinden)
+                other_status = block_repository.check_block_status(blocked_id, blocker_id)
+                self.send_packet(self.online_users[blocked_user], {
+                    "type": "block_user_response",
+                    "payload": {
+                        "status": "success",
+                        "blocker_id": blocked_id,
+                        "blocked_id": blocker_id,
+                        "block_status": other_status
+                    }
+                })
 
     def handle_get_block_list(self, conn, payload):
         blocks = block_repository.get_all_blocks()
