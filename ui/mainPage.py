@@ -632,7 +632,7 @@ class MainPageUI(QWidget):
         self.clear_search_results()
         self.search_input.clear()
 
-    def add_new_chat_to_ui(self, chat_name, last_message="", is_group=False):
+    def add_new_chat_to_ui(self, chat_name, last_message="", is_group=False, unread_count=0):
         # Mükerrer kontrolü: Zaten bu isimde bir chat varsa ekleme
         for i in range(self.chat_screens_stack.count()):
             widget = self.chat_screens_stack.widget(i)
@@ -645,7 +645,7 @@ class MainPageUI(QWidget):
             name=chat_name,
             last_message=last_message,
             time="",
-            unread_count=0,
+            unread_count=unread_count,
             stack_index=new_stack_index,
             is_group=is_group
         )
@@ -1145,32 +1145,37 @@ class MainPageUI(QWidget):
 
     def update_chat_last_message(self, chat_name, content, is_mine, msg_type="text"):
         prefix = "Sen: " if is_mine else ""
-
         if msg_type == "image":
             display_text = f"{prefix}📷 Fotoğraf"
         else:
             display_text = f"{prefix}{content}"
+
+        import datetime
+        time_str = datetime.datetime.now().strftime("%H:%M")
 
         for i in range(self.scroll_layout.count()):
             item = self.scroll_layout.itemAt(i)
             if item and item.widget():
                 widget = item.widget()
                 if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
-                    # msg_label widget'ı bul (layout içinde 2. label)
-                    layout = widget.layout()
-                    for j in range(layout.count()):
-                        inner = layout.itemAt(j)
-                        if inner and inner.layout():
-                            text_layout = inner.layout()
-                            if text_layout.count() >= 2:
-                                msg_label = text_layout.itemAt(1).widget()
-                                if isinstance(msg_label, QLabel):
-                                    msg_label.setText(display_text)
-                                    msg_label.setStyleSheet("font-size: 13px; color: #667781;")
-                                    # Chat'i listenin en üstüne taşı
-                                    self.scroll_layout.removeWidget(widget)
-                                    self.scroll_layout.insertWidget(0, widget)
-                                break
+                    # Metni ve zamanı güncelle
+                    if hasattr(widget, 'msg_label'):
+                        widget.msg_label.setText(display_text)
+                    if hasattr(widget, 'time_label'):
+                        widget.time_label.setText(time_str)
+                    
+                    # Stil güncelleme (Okunmamışsa kalın kalsın)
+                    unread = getattr(widget, 'unread_count', 0) > 0
+                    if unread:
+                        widget.msg_label.setStyleSheet("font-size: 13px; color: #111b21; font-weight: bold;")
+                        widget.time_label.setStyleSheet("font-size: 12px; color: #3b82f6; font-weight: bold;")
+                    else:
+                        widget.msg_label.setStyleSheet("font-size: 13px; color: #667781;")
+                        widget.time_label.setStyleSheet("font-size: 12px; color: #667781;")
+
+                    # Chat'i listenin en üstüne taşı
+                    self.scroll_layout.removeWidget(widget)
+                    self.scroll_layout.insertWidget(0, widget)
                     break
 
     def update_chat_unread_count(self, chat_name, count):
@@ -1214,6 +1219,9 @@ class MainPageUI(QWidget):
                     ids = list(widget.displayed_message_ids)
                     if ids:
                         self.mark_messages_read_signal.emit(str(chat_id), ids)
+                
+                # Okunmamış mesaj sayısını sıfırla
+                self.update_chat_unread_count(chat_name, 0)
                 break
 
     def create_chatbot_item(self):

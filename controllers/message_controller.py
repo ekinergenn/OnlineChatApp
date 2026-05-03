@@ -505,6 +505,9 @@ class MessageController:
                         target_widget.unread_message_ids = []
                     target_widget.unread_message_ids.append(message_id)
 
+        # 8. Sol listedeki son mesaj önizlemesini ve zamanını güncelle
+        self.main_page.update_chat_last_message(chat_name, content, is_mine, msg_type)
+
     # ───────────────────────── GEÇMİŞ MESAJLAR ───────────────────────────────
 
     def load_historical_messages(self, chat_name: str, chat_id: str, messages: list):

@@ -275,11 +275,18 @@ class ChatServer:
                         if me:
                             block_status = block_repository.check_block_status(me["user_id"], other_user_id)
 
+                # Okunmamış mesaj sayısını hesapla
+                unread_count = 0
+                for m in messages:
+                    if username not in m.get("read_by", []):
+                        unread_count += 1
+
                 results.append({
                     "chat_id": cid,
                     "chat_name": chat_obj.get("chat_name") or ([m for m in chat_obj["members"] if m != username][0] if len(chat_obj["members"])==2 else cid),
                     "other_user_id": other_user_id,
                     "block_status": block_status,
+                    "unread_count": unread_count,
                     "messages": messages,
                     "members": chat_obj["members"],
                     "is_group": chat_obj.get("is_group", False)

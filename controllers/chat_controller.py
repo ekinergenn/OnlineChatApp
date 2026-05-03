@@ -220,12 +220,13 @@ class ChatController():
             chat_name = chat.get("chat_name", chat_id)
             messages = chat.get("messages", [])
             other_user_id = chat.get("other_user_id")
+            unread_count = chat.get("unread_count", 0)
             block_status = chat.get("block_status", "none")
             is_group = chat.get("is_group", False)
             members = chat.get("members", [])  # Grup üyeleri
 
             # Arayüze sohbet kartını ekle
-            self.main_page.add_new_chat_to_ui(chat_name, is_group=is_group)
+            self.main_page.add_new_chat_to_ui(chat_name, is_group=is_group, unread_count=unread_count)
 
             # Widget'ı bul ve meta verilerini göm
             for i in range(self.main_page.chat_screens_stack.count()):
