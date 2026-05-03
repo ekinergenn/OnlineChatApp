@@ -188,8 +188,8 @@ class ChatController():
                 is_blocked_by_them = (block_status == "blocked_by_them" or block_status == "both")
                 any_block = (block_status != "none")
 
-                # 1. Menü metnini güncelle (Kişiyi engellediysem "Engeli Kaldır" yazsın)
-                if hasattr(widget, 'block_action'):
+                # 1. Menü metnini güncelle (Sadece ikili sohbetlerde engelleme metni değişir)
+                if hasattr(widget, 'block_action') and not getattr(widget, 'is_group', False):
                     text = "🔓 Engeli Kaldır" if is_blocked_by_me else "🚫 Kişiyi Engelle"
                     widget.block_action.setText(text)
                 
