@@ -15,7 +15,7 @@ class MessageHandler:
         if msg_type == "chat_message":
             self.services['message_service'].receive_new_message(payload)
 
-        elif msg_type == "messages_read_receipt":
+        elif msg_type == "messages_read":
             self.services['message_service'].receive_messages_read_receipt(payload)
 
         elif msg_type == "typing_indicator":
@@ -85,11 +85,10 @@ class MessageHandler:
                 self.services['message_service'].unstar_response_signal.emit(payload)
 
         elif msg_type == "get_privacy_settings_response":
-            if 'message_service' in self.services:
-                self.services['message_service'].privacy_settings_loaded_signal.emit(payload.get("settings", {}))
+            self.services['chat_service'].handle_get_privacy_settings_response(payload)
 
         elif msg_type == "update_privacy_settings_response":
-            print(f"[İSTEMCİ] Gizlilik ayarları güncelleme onayı: {payload.get('status')}")
+            self.services['chat_service'].handle_update_privacy_settings_response(payload)
 
         # --- Topluluklar ---
         elif msg_type == "get_user_communities_response":

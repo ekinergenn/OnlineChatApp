@@ -9,6 +9,9 @@ class ChatService(QObject):
     all_users_loaded_signal = pyqtSignal(list)
     create_group_response_signal = pyqtSignal(dict)
     user_status_signal = pyqtSignal(dict)
+    messages_read_signal = pyqtSignal(dict) # Yeni: (chat_id, message_ids, read_by)
+    privacy_settings_loaded_signal = pyqtSignal(dict) # Yeni: (settings)
+    update_privacy_response_signal = pyqtSignal(bool) # Yeni: (success)
 
     def __init__(self, client):
         super().__init__()
@@ -118,3 +121,24 @@ class ChatService(QObject):
     def handle_user_status_update(self, payload: dict):
         """Sunucudan gelen anlık durum değişikliğini UI'a iletir."""
         self.user_status_signal.emit(payload)
+
+    def send_update_privacy_settings(self, username: str, settings: dict):
+        self.client.send_data({
+            "type": "update_privacy_settings_request",
+            "payload": {"username": username, "settings": settings}
+        })
+
+    def send_get_privacy_settings(self, username: str):
+        self.client.send_data({
+            "type": "get_privacy_settings_request",
+            "payload": {"username": username}
+        })
+
+    def handle_get_privacy_settings_response(self, payload: dict):
+        self.privacy_settings_loaded_signal.emit(payload.get("settings", {}))
+
+    def handle_update_privacy_settings_response(self, payload: dict):
+        self.update_privacy_response_signal.emit(payload.get("status") == "success")
+
+    def handle_messages_read(self, payload: dict):
+        self.messages_read_signal.emit(payload)

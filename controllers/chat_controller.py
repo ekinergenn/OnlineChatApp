@@ -25,6 +25,8 @@ class ChatController():
         self.chat_service.user_status_signal.connect(self.on_user_status_received)
         self.chat_service.all_users_loaded_signal.connect(self.on_all_users_loaded)
         self.chat_service.create_group_response_signal.connect(self.on_group_created)
+        self.message_controller.message_service.messages_read_receipt_signal.connect(self.on_messages_read_received)
+        self.chat_service.privacy_settings_loaded_signal.connect(self.on_privacy_settings_received)
         
         if self.block_service:
             self.block_service.block_status_changed_signal.connect(self.on_block_status_received)
@@ -46,6 +48,9 @@ class ChatController():
         self.main_page.create_group_signal.connect(self.handle_create_group)
         self.main_page.profile_page.update_profile_signal.connect(self.handle_update_profile)
         self.main_page.leave_group_signal.connect(self.handle_leave_group)
+        self.main_page.update_privacy_settings_signal.connect(self.handle_update_privacy)
+        self.main_page.get_privacy_settings_signal.connect(self.handle_get_privacy)
+        self.main_page.mark_messages_read_signal.connect(self.handle_mark_messages_read)
 
     def disconnect_ui_signals(self):
         """UI sinyal bağlantılarını güvenli bir şekilde koparır."""
@@ -61,6 +66,8 @@ class ChatController():
             self.main_page.create_group_signal.disconnect()
             self.main_page.profile_page.update_profile_signal.disconnect()
             self.main_page.profile_page.delete_account_signal.disconnect()
+            self.main_page.update_privacy_settings_signal.disconnect()
+            self.main_page.get_privacy_settings_signal.disconnect()
         except:
             pass
 
@@ -105,7 +112,9 @@ class ChatController():
     def set_current_user(self, profile: dict):
         self.current_user_id = profile.get("user_id")
         self.current_username = profile.get("username")
-
+        
+        # Gizlilik ayarlarını da çek
+        self.chat_service.send_get_privacy_settings(self.current_username)
         self.chat_service.send_get_user_chats_request(self.current_username)
 
     def on_user_status_received(self, payload: dict):
@@ -381,6 +390,30 @@ class ChatController():
             "payload": data
         }
         self.chat_service.client.send_data(packet)
+
+    def handle_update_privacy(self, settings):
+        if self.current_username:
+            self.chat_service.send_update_privacy_settings(self.current_username, settings)
+
+    def handle_get_privacy(self, username):
+        self.chat_service.send_get_privacy_settings(username)
+
+    def on_privacy_settings_received(self, settings):
+        if hasattr(self.main_page, 'settings_page'):
+            self.main_page.settings_page.load_privacy_settings(settings)
+
+    def on_messages_read_received(self, payload):
+        chat_id = payload.get("chat_id")
+        message_ids = payload.get("message_ids", [])
+        read_by = payload.get("read_by")
+        all_read = payload.get("all_read", False)
+        
+        # Arayüzdeki tikleri güncelle
+        self.main_page.update_message_read_status(chat_id, message_ids, read_by, all_read)
+
+    def handle_mark_messages_read(self, chat_id, message_ids):
+        if self.current_username:
+            self.message_controller.message_service.send_mark_as_read(chat_id, message_ids, self.current_username)
 
     def reset_user_data(self):
         self.current_username = None

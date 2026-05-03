@@ -43,6 +43,7 @@ class MainPageUI(QWidget):
     request_blocked_users_signal = pyqtSignal()
     unblock_user_from_settings_signal = pyqtSignal(str)
     leave_group_signal = pyqtSignal(str)
+    mark_messages_read_signal = pyqtSignal(str, list)  # (chat_id, [message_ids])
 
     def __init__(self):
         super().__init__()
@@ -684,13 +685,14 @@ class MainPageUI(QWidget):
                 scroll = widget.scroll
 
                 stretch_item = msg_layout.takeAt(msg_layout.count() - 1)
+                
+                is_group = getattr(widget, 'is_group', False)
 
                 if is_mine:
                     # Mesaj benimse: JSON'a gidecek isim kendi ismim, arayüzde görünecek isim None
                     data_sender = self.current_username
                     display_sender = None
                 else:
-                    is_group = getattr(widget, 'is_group', False)
                     # JSON'a gidecek isim: Eğer grup değilse chat_name, grup ise gelen sender_name
                     data_sender = sender_name if (is_group and sender_name) else chat_name
                     # Arayüzde görünecek isim: Sadece gruplarda isim yazsın
@@ -702,7 +704,9 @@ class MainPageUI(QWidget):
                     message_id=message_id,
                     is_starred=is_starred,
                     real_data_sender=data_sender,
-                    msg_type=msg_type
+                    msg_type=msg_type,
+                    is_group=is_group,
+                    member_count=len(getattr(widget, 'members', [])) if is_group else 2
                 )
                 msg_layout.addWidget(bubble)
 
@@ -718,13 +722,20 @@ class MainPageUI(QWidget):
                 scroll.verticalScrollBar().setValue(
                     scroll.verticalScrollBar().maximum()
                 )
+
+                # --- YENİ: Okundu Bilgisi Gönder (Eğer mesaj benim değilse ve ekran açıksa) ---
+                if not is_mine and message_id:
+                    current_idx = self.chat_screens_stack.currentIndex()
+                    if current_idx == i: # Şu an bu sohbet ekranı mı açık?
+                        chat_id = getattr(widget, 'current_chat_id', chat_name)
+                        self.mark_messages_read_signal.emit(str(chat_id), [message_id])
                 break
 
         self.update_chat_last_message(chat_name, content, is_mine, msg_type=msg_type)
 
     def _create_message_bubble(self, content, is_mine, status="delivered", read_by=None, timestamp=None,
                                sender_name=None, real_data_sender=None, message_id=None, is_starred=False,
-                               msg_type="text"):
+                               msg_type="text", is_group=False, member_count=2):
         if read_by is None:
             read_by = []
 
@@ -1195,19 +1206,14 @@ class MainPageUI(QWidget):
             if hasattr(widget, 'contact_name') and widget.contact_name == chat_name:
                 self.chat_screens_stack.setCurrentIndex(i)
                 self.load_history_signal.emit(chat_name)
-                break
-
-    def update_message_read_status(self, chat_name: str, message_ids: list, reader_username: str):
-        # Sunucudan 'messages_read_receipt' geldiğinde çağrılır
-        # İlgili mesajların tikini mavi yapar
-        for i in range(self.chat_screens_stack.count()):
-            widget = self.chat_screens_stack.widget(i)
-            if getattr(widget, 'contact_name', None) == chat_name:
-                for msg_id in message_ids:
-                    label = widget.message_status_labels.get(str(msg_id))
-                    if label:
-                        label.setText("✓✓")
-                        label.setStyleSheet("color: #3b82f6; font-size: 11px; font-weight: bold;")
+                
+                # --- YENİ: Sohbet açıldığında tüm mesajları okundu işaretle ---
+                chat_id = getattr(widget, 'current_chat_id', None)
+                if chat_id:
+                    # widget.displayed_message_ids içindeki tüm ID'leri gönder (veya son 50'yi)
+                    ids = list(widget.displayed_message_ids)
+                    if ids:
+                        self.mark_messages_read_signal.emit(str(chat_id), ids)
                 break
 
     def create_chatbot_item(self):
@@ -1433,6 +1439,32 @@ class MainPageUI(QWidget):
                     item = msg_layout.takeAt(0)
                     if item.widget():
                         item.widget().deleteLater()
+                break
+
+    def update_message_read_status(self, chat_id, message_ids, read_by, all_read=False):
+        """Sunucudan gelen okundu bilgisini UI'daki ilgili mesajlara yansıtır."""
+        for i in range(self.chat_screens_stack.count()):
+            widget = self.chat_screens_stack.widget(i)
+            # chat_id kontrolü (community_id veya chat_id olabilir)
+            current_id = getattr(widget, 'current_chat_id', None)
+            if current_id == chat_id or f"community_{current_id}" == chat_id:
+                for msg_id in message_ids:
+                    if msg_id in widget.message_status_labels:
+                        label = widget.message_status_labels[msg_id]
+                        is_group = getattr(widget, 'is_group', False)
+                        
+                        # MAVİ TIK ŞARTI:
+                        # Eğer gruptaysak sadece 'all_read' geldiğinde mavi yap.
+                        # Eğer grupta değilsek her zaman mavi yap (çünkü zaten tek kişi okuyabilir).
+                        should_be_blue = all_read or not is_group
+                        
+                        if should_be_blue:
+                            label.setText("✓✓")
+                            label.setStyleSheet("color: #34b7f1; font-weight: bold; font-size: 14px;")
+                        else:
+                            # Grup ama henüz herkes okumadıysa gri çift tık kalabilir
+                            label.setText("✓✓")
+                            label.setStyleSheet("color: #667781; font-weight: normal; font-size: 14px;")
                 break
 
     def reset_ui(self):
