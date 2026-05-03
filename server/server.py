@@ -166,6 +166,20 @@ class ChatServer:
         password = payload.get("password")
         user = find_user(username)
         if user and user["password"] == password:
+            # --- YENİ: Çoklu giriş engelleme ---
+            if username in self.online_users:
+                print(f"[UYARI] {username} zaten başka bir cihazda aktif. Giriş reddedildi.")
+                response = {
+                    "type": "login_response",
+                    "payload": {
+                        "status": "fail",
+                        "message": "Bu hesap şu anda başka bir cihazda aktif. Lütfen diğer cihazdan çıkış yapın."
+                    }
+                }
+                self.send_packet(conn, response)
+                return
+            # ----------------------------------
+
             self.online_users[username] = conn
             self._broadcast_status(username, "online")
             response = {
