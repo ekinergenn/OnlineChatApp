@@ -19,6 +19,7 @@ class CommunitiesPageUI(QWidget):
     join_community_signal = pyqtSignal(int)
     search_query_signal = pyqtSignal(str)
     send_community_message_signal = pyqtSignal(int, str)
+    send_community_image_signal = pyqtSignal(int, str) # Yeni: (comm_id, image_path)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -226,15 +227,21 @@ class CommunitiesPageUI(QWidget):
         for msg in messages:
             self.add_message_bubble(msg_layout, msg["sender"], msg["content"], msg.get("timestamp"))
 
-        # Giriş alanı (Sadece kurucu görebilir veya sadece kurucu yazabilir)
+        # Giriş alanı (Sadece kurucu görebilir)
         if self.current_username == creator:
             input_frame = QFrame()
             input_frame.setFixedHeight(60)
             input_frame.setStyleSheet("background-color: #f0f2f5; border-top: 1px solid #d1d7db;")
             input_layout = QHBoxLayout(input_frame)
+
+            attach_btn = QPushButton("📎")
+            attach_btn.setFixedSize(40, 40)
+            attach_btn.setCursor(QCursor(Qt.PointingHandCursor))
+            attach_btn.setStyleSheet("border: none; font-size: 20px; color: #667781;")
+            attach_btn.clicked.connect(lambda: self.on_attach_clicked(comm_id))
             
             msg_input = QLineEdit()
-            msg_input.setPlaceholderText("Mesaj yazın...")
+            msg_input.setPlaceholderText("Duyuru yayınlayın...")
             msg_input.setStyleSheet("border: none; border-radius: 8px; padding: 8px 15px; background: white;")
             
             send_btn = QPushButton("✈️")
@@ -243,6 +250,7 @@ class CommunitiesPageUI(QWidget):
             send_btn.clicked.connect(lambda: self.on_send_clicked(comm_id, msg_input))
             msg_input.returnPressed.connect(lambda: self.on_send_clicked(comm_id, msg_input))
 
+            input_layout.addWidget(attach_btn)
             input_layout.addWidget(msg_input)
             input_layout.addWidget(send_btn)
             layout.addWidget(input_frame)
@@ -259,6 +267,12 @@ class CommunitiesPageUI(QWidget):
         if text:
             self.send_community_message_signal.emit(comm_id, text)
             input_field.clear()
+
+    def on_attach_clicked(self, comm_id):
+        from PyQt5.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getOpenFileName(self, "Resim Seç", "", "Resimler (*.png *.jpg *.jpeg *.gif *.bmp)")
+        if file_path:
+            self.send_community_image_signal.emit(comm_id, file_path)
 
     def add_message_to_ui(self, comm_id, sender, content, timestamp=None):
         for i in range(self.communities_screens_stack.count()):
@@ -294,13 +308,31 @@ class CommunitiesPageUI(QWidget):
         header_layout.addWidget(sender_lbl)
         header_layout.addStretch()
         header_layout.addWidget(time_lbl)
-
-        content_lbl = QLabel(content)
-        content_lbl.setWordWrap(True)
-        content_lbl.setStyleSheet("font-size: 14px; color: #111b21; line-height: 1.4;")
-        
         bubble_layout.addLayout(header_layout)
-        bubble_layout.addWidget(content_lbl)
+
+        # Görsel mi kontrol et
+        if content.startswith("[IMAGE]"):
+            try:
+                img_data_b64 = content.replace("[IMAGE]", "")
+                from PyQt5.QtCore import QByteArray
+                from PyQt5.QtGui import QImage, QPixmap
+                img_data = QByteArray.fromBase64(img_data_b64.encode())
+                image = QImage.fromData(img_data)
+                
+                img_lbl = QLabel()
+                pixmap = QPixmap.fromImage(image)
+                # Maksimum genişlik sınırlaması
+                scaled_pixmap = pixmap.scaledToWidth(300, Qt.SmoothTransformation)
+                img_lbl.setPixmap(scaled_pixmap)
+                bubble_layout.addWidget(img_lbl)
+            except Exception as e:
+                print(f"Görsel yükleme hatası: {e}")
+                bubble_layout.addWidget(QLabel("[Görsel yüklenemedi]"))
+        else:
+            content_lbl = QLabel(content)
+            content_lbl.setWordWrap(True)
+            content_lbl.setStyleSheet("font-size: 14px; color: #111b21; line-height: 1.4;")
+            bubble_layout.addWidget(content_lbl)
 
         # Baloncuk genişliğini sınırla
         container = QWidget()

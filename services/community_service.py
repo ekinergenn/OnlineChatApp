@@ -45,6 +45,16 @@ class CommunityService(QObject):
             }
         })
 
+    def send_community_image(self, community_id, sender, image_path):
+        try:
+            with open(image_path, "rb") as f:
+                import base64
+                img_data = base64.b64encode(f.read()).decode()
+                content = f"[IMAGE]{img_data}"
+                self.send_community_message(community_id, sender, content)
+        except Exception as e:
+            print(f"Topluluk görsel gönderme hatası: {e}")
+
     def handle_server_response(self, response_type, payload):
         if response_type == "get_user_communities_response":
             self.user_communities_loaded_signal.emit(payload.get("communities", []))
