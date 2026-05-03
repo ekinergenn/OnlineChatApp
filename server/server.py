@@ -9,7 +9,7 @@ from database.user_repository import (
     update_user_info, get_all_users
 )
 from database.message_repository import save_message, get_messages, mark_messages_as_read
-from database.chat_repository import create_chat, get_all_chats, get_chat_, get_user_chats, delete_chat, hide_group_chat
+from database.chat_repository import create_chat, get_all_chats, get_chat_, get_user_chats, delete_chat, hide_group_chat, leave_group_chat
 from database import block_repository, community_repository
 from database.db import write_json
 from database.starred_repository import add_starred_message, remove_starred_message, get_user_starred_messages
@@ -325,14 +325,31 @@ class ChatServer:
 
     def handle_delete_chat(self, conn, payload):
         chat_id = payload.get("chat_id")
+        chat_name = payload.get("chat_name")
         username = payload.get("username", "")
+        action = payload.get("action", "delete")
+
         all_chats = get_all_chats()
         chat_obj = get_chat_(all_chats, chat_id)
+        
+        success = False
         if chat_obj and chat_obj.get("is_group"):
-            success = hide_group_chat(chat_id, username)
+            if action == "leave":
+                success = leave_group_chat(chat_id, username)
+            else:
+                success = hide_group_chat(chat_id, username)
         else:
             success = delete_chat(chat_id)
-        self.send_packet(conn, {"type": "delete_chat_response", "payload": {"status": "success" if success else "fail", "chat_id": chat_id}})
+
+        self.send_packet(conn, {
+            "type": "delete_chat_response", 
+            "payload": {
+                "status": "success" if success else "fail", 
+                "chat_id": chat_id,
+                "chat_name": chat_name,
+                "action": action
+            }
+        })
 
     def handle_search_users(self, conn, payload):
         query = payload.get("query", "").lower()
