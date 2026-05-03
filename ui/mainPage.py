@@ -455,6 +455,12 @@ class MainPageUI(QWidget):
         bottom_layout.addWidget(msg_input)
         bottom_layout.addWidget(send_btn)
 
+        # Referansları sakla (Controller tarafından engelleme durumunda kapatılabilmesi için)
+        chat_frame.msg_input = msg_input
+        chat_frame.send_btn = send_btn
+        chat_frame.attach_btn = attach_btn
+        chat_frame.bottom_bar = bottom_bar
+
         # ── HEPSİNİ ANA LAYOUT'A EKLE ────────────────────────
         layout.addWidget(top_bar)
         layout.addWidget(scroll)  # scroll genişler, stretch alır

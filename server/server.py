@@ -208,7 +208,24 @@ class ChatServer:
         sender = payload.get("sender")
         all_chats = get_all_chats()
         chat = get_chat_(all_chats, chat_id)
+        
         if chat and sender in chat["members"]:
+            # --- YENİ: Engelleme Kontrolü ---
+            if not chat.get("is_group", False) and len(chat["members"]) == 2:
+                receiver = [m for m in chat["members"] if m != sender][0]
+                u1 = find_user(sender)
+                u2 = find_user(receiver)
+                if u1 and u2:
+                    status = block_repository.check_block_status(u1["user_id"], u2["user_id"])
+                    if status != "none":
+                        print(f"[ENGEL] {sender} -> {receiver} mesajı engellendi. (Durum: {status})")
+                        self.send_packet(conn, {
+                            "type": "error",
+                            "payload": {"message": "Bu kullanıcıya mesaj gönderemezsiniz (Engelleme mevcut)."}
+                        })
+                        return
+            # -------------------------------
+
             saved = save_message(payload)
             for m in chat["members"]:
                 if m in self.online_users:
@@ -246,18 +263,35 @@ class ChatServer:
 
     def handle_get_user_chats(self, conn, payload):
         username = payload.get("username")
+        user_obj = find_user(username)
+        if not user_obj: return
+        
         chat_ids = get_user_chats(username)
         all_chats = get_all_chats()
         results = []
         for cid in chat_ids:
             chat_obj = get_chat_(all_chats, cid)
             if chat_obj:
+                other_user_id = None
+                block_status = "none"
+                is_group = chat_obj.get("is_group", False)
+                
+                if not is_group and len(chat_obj["members"]) == 2:
+                    other_member_name = [m for m in chat_obj["members"] if m != username][0]
+                    other_user = find_user(other_member_name)
+                    if other_user:
+                        other_user_id = other_user.get("user_id")
+                        # Engelleme durumunu kontrol et
+                        block_status = block_repository.check_block_status(user_obj.get("user_id"), other_user_id)
+
                 results.append({
                     "chat_id": cid,
                     "chat_name": chat_obj.get("chat_name") or ([m for m in chat_obj["members"] if m != username][0] if len(chat_obj["members"])==2 else cid),
                     "messages": get_messages(cid),
                     "members": chat_obj["members"],
-                    "is_group": chat_obj.get("is_group", False)
+                    "is_group": is_group,
+                    "other_user_id": other_user_id,
+                    "block_status": block_status
                 })
         self.send_packet(conn, {"type": "get_user_chats_response", "payload": {"status": "success", "chats": results}})
 
@@ -266,7 +300,21 @@ class ChatServer:
         chat_id = f"chat_{int(time.time())}"
         create_chat(chat_id, members, is_group=False)
         write_json(f"messages/{chat_id}.json", [])
-        self.send_packet(conn, {"type": "create_chat_response", "payload": {"status": "success", "chat_id": chat_id, "target_username": members[1] if len(members)>1 else ""}})
+        
+        # Karşı tarafın ID'sini bul
+        target_username = members[1] if len(members) > 1 else ""
+        target_user = find_user(target_username)
+        target_id = target_user.get("user_id") if target_user else None
+        
+        self.send_packet(conn, {
+            "type": "create_chat_response", 
+            "payload": {
+                "status": "success", 
+                "chat_id": chat_id, 
+                "target_username": target_username,
+                "other_user_id": target_id
+            }
+        })
 
     def handle_create_group(self, conn, payload):
         chat_id = f"group_{int(time.time())}"
@@ -292,8 +340,21 @@ class ChatServer:
         self.send_packet(conn, {"type": "get_all_users_response", "payload": {"status": "success", "users": sanitized}})
 
     def handle_block(self, conn, payload, status):
-        block_repository.add_or_update_block(payload["blocker_id"], payload["blocked_id"], status)
-        self.send_packet(conn, {"type": "block_user_response", "payload": {"status": "success", "is_blocked": status}})
+        blocker_id = payload.get("blocker_id")
+        blocked_id = payload.get("blocked_id")
+        block_repository.add_or_update_block(blocker_id, blocked_id, status)
+        
+        # Güncel detaylı durumu hesapla
+        current_status = block_repository.check_block_status(blocker_id, blocked_id)
+        
+        self.send_packet(conn, {
+            "type": "block_user_response", 
+            "payload": {
+                "status": "success", 
+                "block_status": current_status,
+                "blocked_id": blocked_id
+            }
+        })
 
     def handle_get_block_list(self, conn, payload):
         blocks = block_repository.get_all_blocks()

@@ -21,26 +21,32 @@ def get_all_blocks() -> list:
 def check_block_status(blocker_id, blocked_id) -> str:
     """
     İki kullanıcı arasındaki engel durumunu kontrol eder.
-    Tip uyuşmazlığı (str vs int) olmaması için her şeyi str'ye çevirerek kıyaslar.
+    Dönen değerler: 'none', 'blocked_by_me', 'blocked_by_them', 'both'
     """
     blocks = get_all_blocks()
-
-    # Kıyaslanacak ID'leri garantiye almak için string'e çeviriyoruz
     my_id = str(blocker_id)
     target_id = str(blocked_id)
 
+    blocked_by_me = False
+    blocked_by_them = False
+
     for block in blocks:
-        # kayıt aktif mi kontrol et
         if block.get("isBlocked") is True:
             b_id = str(block.get("blocker_id"))
             bl_id = str(block.get("blocked_id"))
 
-            # kim engelledi bulur
             if b_id == my_id and bl_id == target_id:
-                return "blocked_by_me"
+                blocked_by_me = True
             if b_id == target_id and bl_id == my_id:
-                return "blocked_by_them"
+                blocked_by_them = True
 
+    if blocked_by_me and blocked_by_them:
+        return "both"
+    if blocked_by_me:
+        return "blocked_by_me"
+    if blocked_by_them:
+        return "blocked_by_them"
+    
     return "none"
 
 

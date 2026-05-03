@@ -77,15 +77,14 @@ class ChatController():
         self.main_page.update_chat_status_bar(username, status, last_seen_ts)
 
     def on_block_status_received(self, payload: dict):
-        # Sunucudan gelen block yanıtını işle
+        # Sunucudan gelen detaylı block durumunu işle
         blocked_id = payload.get("blocked_id")
-        is_blocked = payload.get("is_blocked")
+        block_status = payload.get("block_status") # "none", "blocked_by_me", "blocked_by_them", "both"
 
-        # UI'daki tüm açık sohbetleri tara ve bu kullanıcıya aitse güncelle
         for i in range(self.main_page.chat_screens_stack.count()):
             widget = self.main_page.chat_screens_stack.widget(i)
             if getattr(widget, 'other_user_id', None) == str(blocked_id):
-                self.update_block_ui_elements(getattr(widget, 'contact_name', ""), is_blocked)
+                self.update_block_ui_elements(getattr(widget, 'contact_name', ""), block_status)
                 break
 
     def handle_block_user(self, contact_name):
@@ -130,13 +129,40 @@ class ChatController():
             from PyQt5.QtCore import QTimer
             QTimer.singleShot(200, self.handle_request_blocked_users)
 
-    def update_block_ui_elements(self, contact_name, is_blocked):
+    def update_block_ui_elements(self, contact_name, block_status):
         for i in range(self.main_page.chat_screens_stack.count()):
             widget = self.main_page.chat_screens_stack.widget(i)
             if getattr(widget, 'contact_name', None) == contact_name:
+                
+                is_blocked_by_me = (block_status == "blocked_by_me" or block_status == "both")
+                is_blocked_by_them = (block_status == "blocked_by_them" or block_status == "both")
+                any_block = (block_status != "none")
+
+                # 1. Menü metnini güncelle (Kişiyi engellediysem "Engeli Kaldır" yazsın)
                 if hasattr(widget, 'block_action'):
-                    text = "🔓 Engeli Kaldır" if is_blocked else "🚫 Kişiyi Engelle"
+                    text = "🔓 Engeli Kaldır" if is_blocked_by_me else "🚫 Kişiyi Engelle"
                     widget.block_action.setText(text)
+                
+                # 2. Mesaj giriş alanlarını kapat/aç ve metni ayarla
+                if hasattr(widget, 'msg_input'):
+                    widget.msg_input.setEnabled(not any_block)
+                    
+                    if block_status == "blocked_by_me":
+                        placeholder = "Bu kişiyi engellediniz."
+                    elif block_status == "blocked_by_them":
+                        placeholder = "Bu kişi sizi engellemiş."
+                    elif block_status == "both":
+                        placeholder = "Karşılıklı engelleme mevcut."
+                    else:
+                        placeholder = "Bir mesaj yazın"
+                    
+                    widget.msg_input.setPlaceholderText(placeholder)
+                
+                if hasattr(widget, 'send_btn'):
+                    widget.send_btn.setEnabled(not any_block)
+                if hasattr(widget, 'attach_btn'):
+                    widget.attach_btn.setEnabled(not any_block)
+                
                 break
 
     def load_user_chats(self, chats: list):
@@ -160,11 +186,8 @@ class ChatController():
                     widget.is_group = is_group
                     widget.members = members
 
-                    if not is_group and hasattr(widget, 'block_action'):
-                        if block_status == "blocked_by_me":
-                            widget.block_action.setText("🔓 Engeli Kaldır")
-                        else:
-                            widget.block_action.setText("🚫 Kişiyi Engelle")
+                    # Engelleme durumuna göre UI'ı güncelle (Açılışta yükleme)
+                    self.update_block_ui_elements(chat_name, block_status)
                     break
 
             # 1-1 sohbetlerde kullanıcı durumunu sor (sadece bir kez, dışarıda)
@@ -198,6 +221,7 @@ class ChatController():
         if payload.get("status") == "success":
             chat_id = payload.get("chat_id")
             target_name = payload.get("target_username")
+            other_user_id = payload.get("other_user_id")
 
             self.main_page.add_new_chat_to_ui(target_name)
 
@@ -205,6 +229,7 @@ class ChatController():
                 widget = self.main_page.chat_screens_stack.widget(i)
                 if hasattr(widget, 'contact_name') and widget.contact_name == target_name:
                     widget.current_chat_id = chat_id
+                    widget.other_user_id = str(other_user_id) if other_user_id else None
                     break
 
     # TAMAMEN YENİ FONKSİYON
