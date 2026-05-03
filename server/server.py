@@ -118,6 +118,7 @@ class ChatServer:
         elif msg_type == "join_community_request": self.handle_join_community(conn, payload)
         elif msg_type == "search_communities_request": self.handle_search_communities(conn, payload)
         elif msg_type == "get_user_communities_request": self.handle_get_user_communities(conn, payload)
+        elif msg_type == "logout_request": self.handle_logout(conn, payload)
 
     def send_packet(self, conn, packet_dict):
         try:
@@ -130,6 +131,19 @@ class ChatServer:
     def handle_login(self, conn, payload):
         username = payload.get("name")
         password = payload.get("password")
+
+        # 1. Zaten giriş yapmış mı kontrol et (Eşzamanlı girişi engelle)
+        if username in self.online_users:
+            response = {
+                "type": "login_response", 
+                "payload": {
+                    "status": "fail", 
+                    "message": "Bu hesap şu an başka bir cihazda aktif!"
+                }
+            }
+            self.send_packet(conn, response)
+            return
+
         user = find_user(username)
         if user and user["password"] == password:
             self.online_users[username] = conn
@@ -149,6 +163,17 @@ class ChatServer:
         else:
             response = {"type": "login_response", "payload": {"status": "fail", "message": "Hatalı giriş!"}}
         self.send_packet(conn, response)
+
+    def handle_logout(self, conn, payload):
+        username = payload.get("username")
+        if username in self.online_users:
+            print(f"[SUNUCU] {username} çıkış yaptı.")
+            self.last_seen[username] = int(time.time())
+            del self.online_users[username]
+            self._broadcast_status(username, "offline", self.last_seen[username])
+            
+            # Onay gönder
+            self.send_packet(conn, {"type": "logout_response", "payload": {"status": "success"}})
 
     def handle_register(self, conn, payload):
         success = create_user(payload.get("username"), payload.get("password"), payload.get("fullname"), payload.get("email"), payload.get("tel", ""))
